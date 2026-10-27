@@ -249,6 +249,41 @@
 
   Object.assign(api, { CATALOG }); // (tutorial helper)
 
+  // Decomposition of mahjong hand. **All ways to split `cc` (counts) into `need` chows/pungs. cc must hold exactly 3*need tiles.
+
+  function enumSets(cc, need) {
+    let i = 0;
+    while (i < 34 && cc[i] === 0) i++;
+    if (i === 34) return need === 0 ? [[]] : [];
+    if (need === 0) return [];
+    const out = [];
+    if (cc[i] >=3) {
+        cc[i] -= 3;
+        for (const rest of enumSets(cc, need - 1)) out.push([{ type : 'pung', tile: i }].concat(rest));
+        cc[i] += 3;
+    }
+    if (isSuit(i) && numOf(i) <= 7 /* 7-8-9 chow */ && cc[i + 1] > 0 && cc[i + 2] > 0){
+        cc[i]--; cc[i + 1]--; cc[i + 2]--;
+        for (const rest of enumSets(cc, need - 1)) out.push([{ type: 'chow', tile: i}].concat(rest));
+        cc[i]++; cc[i + 1]++; cc[i + 2]++;
+    }
+    return out;
+  }
+
+  // All (sets + pair) decompositions of the counts.
+  function decompose(cc, need) {
+    const res = [];
+    for(let p = 0; p < 34; p++) {
+        if (cc[p] < 2) continue;
+        cc[p] -= 2;
+        for (const sets of enumSets(cc, need)) res.push({ groups: sets, pair: p});
+        cc[p] += 2;
+    }
+    return res;
+  }
+
+  Object.assign(api, { enumSets, decompose }); // (tutorial helper)
+
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.MCR = api;
 })(typeof window !== 'undefined' ? window : globalThis);
