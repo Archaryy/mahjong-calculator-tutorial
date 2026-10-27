@@ -284,6 +284,242 @@
 
   Object.assign(api, { enumSets, decompose }); // (tutorial helper)
 
+  // faan counting / finder
+  function combos(arr, k) {
+    const out = [];
+    (function rec(start, cur) {
+      if (cur.length === k) { out.push(cur.slice()); return; }
+      for (let j = start; j < arr.length; j++) {
+        cur.push(arr[j]); 
+        rec(j + 1, cur); cur.pop();
+      }
+    }) 
+    (0, []);
+    return out;
+  }
+
+  // faan depend which specific tiles on hand
+  function tileFans(c, add) {
+    const present = []; // hand array
+    for (let i = 0; i < 34; i++) if (c[i]) present.push(i);
+    const all = (f) => present.every(f);
+    const suits = new Set(present.filter(isSuit).map(suitOf));
+    const honors = present.some(isHonor);
+    const hasWind = present.some(isWind);
+    const hasDragon = present.some(isDragon);
+
+    if (all((i) => GREEN.has(i))) add('allGreen');
+    if (all(isTerminal)) add('allTerminals');
+    if (all(isHonor)) add('allHonors');
+    if (all(isTermOrHonor)) add('allTerminalsAndHonors');
+    if (!honors && suits.size === 1) add('fullFlush'); // only have 1 type of suit
+    if (honors && suits.size === 1) add('halfFlush'); // only have honors and 1 type of suit
+    if (all((i) => isSuit(i) && numOf(i) >= 7)) add('upperTiles');
+    if (all((i) => isSuit(i) && numOf(i) >= 4 && numOf(i) <= 6)) add('middleTiles');
+    if (all((i) => isSuit(i) && numOf(i) <= 3)) add('lowerTiles');
+    if (all((i) => isSuit(i) && numOf(i) >= 6)) add('upperFour');
+    if (all((i) => isSuit(i) && numOf(i) <= 4)) add('lowerFour');
+    if (all((i) => isSuit(i) && numOf(i) >= 2 && numOf(i) <= 8)) add('allSimples');
+    if (all((i) => REVERSIBLE.has(i))) add('reversibleTiles');
+    if (suits.size === 3 && hasWind && hasDragon) add('allTypes'); 
+    if (!honors) add('noHonors');
+    if (suits.size === 2) add('oneVoidedSuit');
+  }
+
+  // faan situational hand won
+  function situationFans(ctx, hasExposed, add) {
+    if (ctx.selfDrawn) add('selfDrawn');
+    if(!hasExposed) add(ctx.selfDrawn ? 'fullyConcealed' : 'concealedHand');
+    if(ctx.lastTile) add('lastTile');
+    if(ctx.lastOfWall) add(ctx.selfDrawn ? 'lastTileDraw' : 'lastTileClaim');
+    if(ctx.replacement) add('outWithReplacement');
+    if(ctx.robbing) add('robbingKong');
+    if(ctx.flowers > 0) add ('flowers', { count: ctx.flowers });
+  }
+
+  Object.assign(api, { tileFans, situationFans }); // (tutorial helper)
+
+  // Faan that depends on sets in standard hand (4 sets + pair, knitted straight + ...)
+  function standardFans(I, pl, ctx, c, add) {
+    const groups = I.groups.map((g, i) => {
+      const o = Object.assign({}, g);
+      if(g.type === 'pung' || g.type === 'kong') {
+        // pung from discarded tile from opponent (not concealed)
+        o.cp = g.declared ? g.type === 'kong' && g.concealedKong : !(pl.kind === 'pung' && pl.idx === i && !ctx.selfDrawn);
+      }
+      return o;
+    });
+
+    const pair = I.pair;
+    const T = (i) => groups[i].tile;
+    const cs = (i) => suitOf(T(i));
+    const cn = (i) => numOf(T(i));
+    const sortedN = (ids) => ids.map(cn).sort((a, b) => a - b);
+    const sameSuit = (ids) => new Set(ids.map(cs)).size === 1;
+    const distinctSuits = (ids) => new Set(ids.map(cs)).size === ids.length;
+    const run = (n, step) => n.every((v, k) => k === 0 || v - n[k - 1] === step);
+
+    const chowIdx = []; // how many was chow (which ones?)
+    const pungIdx = []; // how many was pung (which ones?)
+    groups.forEach((g, i) => {
+      if(g.type === 'chow') chowIdx.push(i);
+      else if (g.type === 'pung' || g.type === 'kong') pungIdx.push(i);
+    });
+    const full = groups.length === 4;
+
+    // chow combinations
+    if(chowIdx.length === 4) {
+      const n = sortedN(chowIdx);
+      if(chowIdx.every((i) => cs(i) === cs(chowIdx[0]) && cn(i) === cn(chowIdx[0]))) add('quadrupleChow', { uses: chowIdex});
+      if (sameSuit(chowIdx) && (run(n, 1) || run(n, 2))) add('fourPureShiftedChows', { uses: chowIdx });
+      if (sameSuit(chowIdx) && isSuit(pair) && suitOf(pair) === cs(chowIdx[0]) && numOf(pair) === 5 && n.join() === '1,1,7,7') {
+        add('pureTerminalChows', { uses: chowIdx });
+      }
+      if (isSuit(pair)) {
+        const set = new Set(chowIdx.map(cs));
+        if (set.size === 2 && !set.has(suitOf(pair)) && numOf(pair) === 5) {
+          let ok = true;
+          for (const su of set) {
+            const ns = chowIdx.filter((i) => cs(i) === su).map(cn).sort((a,b) => a - b);
+            if (ns.join() !== '1,7') ok = false;
+          }
+          if (ok) add('threeSuitedTerminalChows', { uses: chowIdx });
+        }
+      }
+    }
+
+    for (const t of combos(chowIdx, 3)) {
+      const n = sortedN(t);
+      if (sameSuit(t)) {
+        if (n[0] === n[1] && n[1] === n[2]) add('pureTripleChow', { uses: t }); // same suit and number as chow
+        else if (run(n, 1) || run(n, 2)) add('pureShiftedChows', { uses: t });
+        if (n.join() === '1,4,7') add('pureStraight', { uses: t }); // chows start with 1, 4, and 7 (same suit)
+      } else if (distinctSuits(t)) {
+        if (n[0] === n[1] && n[1] === n[2]) add('mixedTripleChow', { uses: t });
+        if (n.join() === '1,4,7') add('mixedStraight', { uses: t }); // chows start with 1, 4, 7 but from different suits
+        if (run(n, 1)) add('mixedShiftedChows', { uses: t });
+      }
+    }
+    for (const p of combos(chowIdx, 2)) {
+      const [a, b] = p;
+      const na = cn(a), nb = cn(b);
+      if (cs(a) === cs(b)) {
+        if (na === nb) add('pureDoubleChow', { uses: p });
+        else if (Math.abs(na - nb) === 3) add('shortStraight', { uses: p });
+        if ((na === 1 && nb === 7) || (na === 7 && nb === 1)) add('twoTerminalChows', { uses: p });
+      } else if (na === nb) {
+        add('mixedDoubleChow', { uses: p });
+      }
+    }
+    
+    // pung combinations (numbered tiles)
+    const suitPungs = pungIdx.filter((i) => isSuit(T(i)));
+    if (suitPungs.length === 4 && sameSuit(suitPungs) && run(sortedN(suitPungs), 1)) add('fourPureShiftedPungs', { uses: suitPungs }); // must have 4, same suit and numbers shifted with sort
+    for (const t of combos(suitPungs, 3)) {
+      const n = sortedN(t);
+      if (sameSuit(t) && run(n, 1)) add('pureShiftedPungs', { uses: t }); // 3 sets of shifted pungs with same suit
+      else if (distinctSuits(t)) {
+        if (run(n, 1)) add('mixedShiftedPungs', { uses: t }); // 3 shifted but different Suits
+        if (n[0] === n[1] && n[1] === n[2]) add('triplePung', { uses: t });
+      }
+    }
+    for (const p of combos(suitPungs, 2)) {
+      if (cs(p[0]) !== cs(p[1]) && cn(p[0]) === cn(p[1])) add('doublePung', { uses: p });
+  }
+
+  // individual pung
+  pungIdx.forEach((i) => {
+      const t = T(i);
+      if (isDragon(t)) add('dragonPung', { g: i });
+      else if (isWind(t)) {
+        let special = false;
+        if (t === 27 + ctx.prevalent) { add('prevalentWind', { g: i }); special = true; }
+        if (t === 27 + ctx.seat) { add('seatWind', { g: i }); special = true; }
+        if (!special) add('pungTerminalsHonors', { g: i });
+      } else if (isTerminal(t)) add('pungTerminalsHonors', { g: i });
+    });
+
+    const windP = pungIdx.filter((i) => isWind(T(i)));
+    const dragP = pungIdx.filter((i) => isDragon(T(i)));
+    if (windP.length === 4) add('bigFourWinds');
+    if (windP.length === 3) {
+      if (isWind(pair)) add('littleFourWinds', { consumes: { pungTerminalsHonors: windP } }); // exclusion of additional faan combination
+      add('bigThreeWinds', { consumes: { pungTerminalsHonors: windP } }); // exclusion of additional faan combination
+    }
+    if (dragP.length === 3) add('bigThreeDragons');
+    if (dragP.length === 2) {
+      add('twoDragonPungs');
+      if (isDragon(pair)) add('littleThreeDragons');
+    }
+
+    if (full && pungIdx.length === 4) {
+      add('allPungs');
+      const even = (t) => isSuit(t) && numOf(t) % 2 === 0;
+      if (pungIdx.every((i) => even(T(i))) && even(pair)) add('allEvenPungs');
+    }
+
+    // concealed pungs and kongs (difference in faan)
+    const cp = pungIdx.filter((i) => groups[i].cp).length;
+    if (cp >= 4) add('fourConcealedPungs');
+    if (cp >= 3) add('threeConcealedPungs');
+    if (cp >= 2) add('twoConcealedPungs');
+    const kongC = groups.filter((g) => g.type === 'kong' && g.concealedKong).length;
+    const kongE = groups.filter((g) => g.type === 'kong' && !g.concealedKong).length;
+    if (kongC + kongE === 4) add('fourKongs');
+    if (kongC + kongE === 3) add('threeKongs');
+    if (kongC === 2) add('twoConcealedKongs');
+    if (kongE === 2) add('twoMeldedKongs');
+    if (kongC >= 1 && kongE >= 1) add('concealedAndMeldedKong');
+    for (let k = 0; k < kongC; k++) add('concealedKong');
+    for (let k = 0; k < kongE; k++) add('meldedKong');
+
+    // whole hand shapes
+    if (chowIdx.length === 4 && isSuit(pair)) add('allChows');
+    if (full) {
+      const outside = groups.every((g) => {
+        if (g.type === 'chow') return numOf(g.tile) === 1 || numOf(g.tile) === 7;
+        return isTermOrHonor(g.tile);
+      }) && isTermOrHonor(pair);
+      if (outside) add('outsideHand');
+
+      const five = groups.every((g) => {
+        if (g.type === 'chow') return numOf(g.tile) >= 3 && numOf(g.tile) <= 5;
+        return isSuit(g.tile) && numOf(g.tile) === 5;
+      }) && isSuit(pair) && numOf(pair) === 5;
+      if (five) add('allFives');
+    }
+    if (I.knitted) add('knittedStraight');
+
+    for (let i = 0; i < 34; i++) {
+      if (c[i] === 4 && !groups.some((g) => g.type === 'kong' && g.tile === i)) add('tileHog');
+    }
+
+    // nine gates (unique one suited concealed hand)
+    if (ctx.noMelds) {
+      const suits = new Set();
+      for (let i = 0; i < 34; i++) if (c[i]) suits.add(suitOf(i));
+      if (suits.size === 1 && !suits.has(3)) {
+        const s = [...suits][0];
+        const base = [3, 1, 1, 1, 1, 1, 1, 1, 3];
+        if (base.every((b, k) => c[s * 9 + k] >= b)) add('nineGates');
+      }
+    }
+
+    // melded hand and waits
+    if (full && !ctx.selfDrawn && pl.kind === 'pair' && groups.every((g) => g.declared && !(g.type === 'kong' && g.concealedKong))) {
+      add('meldedHand');
+    }
+    if (pl.kind === 'pair') add('singleWait');
+    else if (pl.kind === 'chow') {
+      const g = groups[pl.idx];
+      if (pl.pos === 1) add('closedWait');
+      else if (pl.pos === 2 && numOf(g.tile) === 1) add('edgeWait');
+      else if (pl.pos === 0 && numOf(g.tile) === 7) add('edgeWait');
+    }
+  }
+
+  Object.assign(api, { standardFans }); // (tutorial helper)
+
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.MCR = api;
 })(typeof window !== 'undefined' ? window : globalThis);
