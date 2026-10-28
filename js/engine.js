@@ -520,6 +520,119 @@
 
   Object.assign(api, { standardFans }); // (tutorial helper)
 
+  // resolve or determine best set of non overlapping combination of hand (each set may be used once)
+  function bestSubset(items) {
+    let best =-1;
+    let bestSet = [];
+    const rec = (i, cur, sum, used) => {
+      if (i === items.length) {
+        if (sum > best || (sum === best && cur.length > bestSet.length)) {
+          best = sum; bestSet = cur.slice(); 
+        }
+        return;
+      }
+
+      const it = items[i];
+      if (!(it.mask & used)) {
+        cur.push(it);
+        rec(i + 1, cur, sum + it.fan, used | it.mask);
+        cur.pop();
+      }
+      rec(i + 1, cur, sum, used);
+    };
+    rec(0, [], 0, 0);
+    return bestSet;
+  }
+
+  // Apply exclusion rules and no reuse rule
+  function resolve(instances) { // take raw list from catalog *e.g fullFlush, noHonors
+    const order = instances.slice().sort((a, b) => CATALOG[b.id].fan - CATALOG[a.id].fan);
+    const excluded = new Set();
+    const scoped = [];
+    const kept = [];
+    for (const inst of order) {
+      if (excluded.has(inst.id)) continue;
+      if (inst.g !== undefined && scoped.some((s) => s.id === inst.id && s.groups.includes(inst.g))) continue;
+      kept.push(inst);
+      CATALOG[inst.id].excludes.forEach((e) => excluded.add(e));
+      if (inst.consumes) {
+        for (const id of Object.keys(inst.consumes)) scoped.push({ id, groups: inst.consumes[id] }); // bigger faan consumes
+    }
+  }
+  const free = kept.filter((k) => !k.uses);
+    const combo = kept.filter((k) => k.uses).map((k) => ({
+      inst: k,
+      fan: CATALOG[k.id].fan,
+      mask: k.uses.reduce((m, i) => m | (1 << i), 0),
+    }));
+    const chosen = bestSubset(combo).map((x) => x.inst);
+    let list = free.concat(chosen);
+
+    const hasBase = list.some((x) => x.id !== 'flowers');
+    if (!hasBase) list = list.concat([{ id: 'chickenHand' }]); // if hand doesn't have any combination
+
+    // merge into {id: count}
+    const merged = new Map();
+    for (const x of list) merged.set(x.id, (merged.get(x.id) || 0) + (x.count || 1));
+    const fans = [...merged.entries()].map(([id, count]) => ({
+      id,
+      name: CATALOG[id].name,
+      zh: CATALOG[id].zh,
+      fan: CATALOG[id].fan,
+      count,
+      points: CATALOG[id].fan * count,
+    })).sort((a, b) => b.fan - a.fan || a.name.localeCompare(b.name));
+    const total = fans.reduce((s, f) => s + f.points, 0);
+    const flowers = merged.get('flowers') || 0; // tracked separately not including the 8 point minimum to win
+    return { fans, total, base: total - flowers, flowers };
+  }
+
+    Object.assign(api, { resolve }); // (tutorial helper)
+
+
+    // special hands
+    function thirteenOrphans(c) {
+      let sum = 0;
+      for (const o of ORPHANS) { if(c[0] < 1) return false; sum += c[o]; } // hand must consist of every tile
+      return sum === 14;
+    }
+
+    function sevenPairs(c) {
+      let pairs = 0;
+      for (let i = 0; i < 34; i++) {
+        if(c[i] === 0) continue;
+        if(c[i] !== 2) return false;
+        pairs++;
+      }
+      return pairs === 7;
+    }
+    
+    function sevenShiftedPairs(c) {
+      if(!sevenPairs(c)) return false; // must be seven pairs first
+      const tiles = [];
+      for (let i = 0; i < 34; i++) if (c[i]) tiles.push(i);
+      if (! tiles.every(isSuit) || new Set(tiles.map(suitOf)).size !== 1) return false;
+      return tiles.every((t, k) => k === 0 || t - tiles[k - 1] === 1);
+    }
+
+    function knittedHonors(c) {
+    for (let i = 0; i < 34; i++) if (c[i] > 1) return null;
+    for (const perm of KNIT_PERMS) {
+      const allowed = new Set();
+      for (let s = 0; s < 3; s++) for (let k = 0; k < 3; k++) allowed.add(s * 9 + perm[s] + 3 * k); // pattern check
+      let ok = true, kn = 0, h = 0;
+      for (let i = 0; i < 34; i++) {
+        if (!c[i]) continue;
+        if (isHonor(i)) h++;
+        else if (allowed.has(i)) kn++;
+        else { ok = false; break; }
+      }
+      if (ok) return h === 7 ? 'greaterHonorsKnitted' : kn >= 8 ? 'lesserHonorsKnitted' : null;
+    }
+    return null;
+  }
+  Object.assign(api, { thirteenOrphans, sevenPairs, sevenShiftedPairs, knittedHonors }); // (tutorial helper)
+
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.MCR = api;
 })(typeof window !== 'undefined' ? window : globalThis);
