@@ -631,7 +631,173 @@
     }
     return null;
   }
+
   Object.assign(api, { thirteenOrphans, sevenPairs, sevenShiftedPairs, knittedHonors }); // (tutorial helper)
+
+  // score
+  function groupTiles(g) {
+    if (g.type === 'chow') return [g.tile, g.tile + 1, g.tile + 2];
+    if (g.type === 'pung') return [g.tile, g.tile, g.tile];
+    if (g.type === 'kong') return [g.tile, g.tile, g.tile, g.tile];
+    return g.tiles.slice(); // prepare for display
+  }
+
+  function validate(input) {
+    if (!input || typeof input.win !== 'number') return 'Choose a winning tile.'; // reminder to complete the hand with a winning
+    const melds = input.melds || [];
+    if (melds.length > 4) return 'A hand has at most four melds.'; // validate user input
+    if (!Array.isArray(input.hand) || input.hand.length !== 13 - 3 * melds.length) {
+      return 'The concealed hand needs ' + (13 - 3 * melds.length) + ' tiles plus the winning tile.';
+    }
+    for (const m of melds) {
+      if (m.type === 'chow' && (!isSuit(m.tile) || numOf(m.tile) > 7)) return 'Invalid chow.';
+    }
+    return null;
+  }
+
+  Object.assign(api, { validate }); // (tutorial helper)
+
+  function score(input) {
+    const err = validate(input);
+    if (err) return { valid: false, error: err };
+
+    const melds = input.melds || [];
+    const hand = input.hand;
+    const win = input.win;
+    const ctx = {
+      selfDrawn: !!input.selfDrawn,
+      prevalent: input.prevalent| 0,
+      seat: input.seat | 0,
+      flowers: Math.max(0, input.flowers | 0),
+      lastTile: !!input.lastTile,
+      lastOfWall: !!input.lastOfWall,
+      replacement: !!input.replacement,
+      robbing: !!input.robbing,
+      noMelds: melds.length === 0,
+    };
+
+    const declared = melds.map((m) => ({
+      type: m.type,
+      tile: m.tile,
+      declared: true,
+      concealedKong: m.type === 'kong' && !!m.concealed,
+    }));
+
+    const hasExposed = declared.some((g) => !(g.type === 'kong' && g.concealedKong));
+
+    const c = new Array(34).fill(0); // every tile, kongs count 4
+    const cc = new Array(34).fill(0); // concealed part incl. winning tile
+    for (const g of declared) {
+      if (g.type === 'chow') { c[g.tile]++; c[g.tile + 1]++; c[g.tile + 2]++; }
+      else c[g.tile] += g.type === 'kong' ? 4 : 3;
+    }
+    for (const t of hand) { c[t]++; cc[t]++; }
+    c[win]++; cc[win]++;
+    for (let i = 0; i < 34; i++) {
+      if (c[i] > 4) return { valid: false, error: 'Too many copies of ' + tileName(i) + '.' }; // hand is impossible, error output for now.
+    }
+
+    const m = melds.length;
+    const candidates = []; // {interp, placement?}
+
+    // standard : 4 sets + pair
+    for (const d of decompose(cc.slice(), 4 - m)) {
+      const groups = declared.concat(d.groups.map((g) => ({ type: g.type, tile: g.tile, declared: false })));
+      candidates.push({ kind: 'standard', groups, pair: d.pair });
+    }
+    // standard with a knitted straight (9 tiles) + one set + pair
+    if (m <= 1) {
+      for (const perm of KNIT_PERMS) {
+        const tiles = [];
+        for (let s = 0; s < 3; s++) for (let k = 0; k < 3; k++) tiles.push(s * 9 + perm[s] + 3 * k);
+        if (!tiles.every((t) => cc[t] > 0)) continue;
+        const cc2 = cc.slice();
+        tiles.forEach((t) => cc2[t]--);
+        for (const d of decompose(cc2, 1 - m)) {
+          const groups = declared
+            .concat([{ type: 'knitted', tile: tiles[0], tiles, declared: false }])
+            .concat(d.groups.map((g) => ({ type: g.type, tile: g.tile, declared: false })));
+          candidates.push({ kind: 'standard', groups, pair: d.pair, knitted: true });
+        }
+      }
+    }
+    // special hands (no melds)
+    if (m === 0) {
+      if (thirteenOrphans(c)) candidates.push({ kind: 'thirteenOrphans' });
+      if (sevenShiftedPairs(c)) candidates.push({ kind: 'sevenShiftedPairs' });
+      else if (sevenPairs(c)) candidates.push({ kind: 'sevenPairs' });
+      const kh = knittedHonors(c);
+      if (kh) candidates.push({ kind: kh });
+    }
+    if (candidates.length === 0) return { valid: false, error: 'This is not a complete winning hand.' };
+
+    let best = null;
+    const consider = (res, I) => {
+      if (!best || res.total > best.total) best = Object.assign({}, res, { interp: I });
+    };
+
+    for (const I of candidates) {
+      if (I.kind !== 'standard') {
+        const inst = [];
+        const add = (id, extra) => inst.push(Object.assign({ id }, extra || {}));
+        add(I.kind);
+        tileFans(c, add);
+        situationFans(ctx, hasExposed, add);
+        consider(resolve(inst), I);
+        continue;
+      }
+      // every way the winning tile could complete this arrangement
+      const seen = new Set();
+      const placements = [];
+      const push = (p, key) => { if (!seen.has(key)) { seen.add(key); placements.push(p); } };
+      if (I.pair === win) push({ kind: 'pair' }, 'pair');
+      I.groups.forEach((g, i) => {
+        if (g.declared) return;
+        if (g.type === 'chow') {
+          const d = win - g.tile;
+          if (d >= 0 && d <= 2) push({ kind: 'chow', idx: i, pos: d }, 'chow:' + g.tile + ':' + d);
+        } else if (g.type === 'pung') {
+          if (g.tile === win) push({ kind: 'pung', idx: i }, 'pung:' + g.tile);
+        } else if (g.type === 'knitted') {
+          if (g.tiles.includes(win)) push({ kind: 'knitted', idx: i }, 'knit'); // for additional points in waiting.
+        }
+      });
+      for (const pl of placements) {
+        const inst = [];
+        const add = (id, extra) => inst.push(Object.assign({ id }, extra || {}));
+        tileFans(c, add);
+        situationFans(ctx, hasExposed, add);
+        standardFans(I, pl, ctx, c, add);
+        consider(resolve(inst), I);
+      }
+    }
+    if (!best) return { valid: false, error: 'This is not a complete winning hand.' };
+
+    const I = best.interp;
+    let decomposition;
+    if (I.kind === 'standard') {
+      decomposition = {
+        kind: I.knitted ? 'knitted' : 'standard',
+        groups: I.groups.map((g) => ({ type: g.type, declared: !!g.declared, concealedKong: !!g.concealedKong, tiles: groupTiles(g) })),
+        pair: [I.pair, I.pair],
+      };
+    } else {
+      const tiles = [];
+      for (let i = 0; i < 34; i++) for (let k = 0; k < c[i]; k++) tiles.push(i);
+      decomposition = { kind: I.kind, groups: [], pair: null, tiles };
+    }
+    return {
+      valid: true,
+      total: best.total,
+      base: best.base,
+      flowers: best.flowers,
+      meetsMinimum: best.base >= 8,
+      fans: best.fans,
+      decomposition,
+    };
+  }
+
+  Object.assign(api, { score, isSuit, numOf, suitOf });
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.MCR = api;
