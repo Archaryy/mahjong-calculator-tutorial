@@ -1,8 +1,6 @@
 MCR Mahjong Calculator
 A web app that scores a Mahjong hand under Mahjong Competition Rules (MCR, 国标麻将). Pick the tiles of a winning hand, say how it was won, and see every scoring pattern (fan), the total, and how the hand was split into sets.
 
-[Live demo: paste your link here after Part C]
-
 Features
 Tile picker with claimed chows, pungs, kongs and concealed kongs
 81 MCR scoring patterns plus flower tiles, with the exclusion rules
