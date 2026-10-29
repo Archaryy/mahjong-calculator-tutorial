@@ -3,9 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>MCR Mahjong Calculator</title>
+    <meta name="description" content="Build a winning hand and get the fan breakdown under Mahjong Competition Rules (MCR).">
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    
+    <header class="top">
+        <div class="wrap">
+            <h1>
+                MCR Mahjong Calculator <span class="zh">国标麻将算番器</span>
+            </h1>
+            <p>
+                Build a winning hand and see the fan breakdown. Mahjong Competition Rules (8-fan minimum to win).
+            </p>
+        </div>
+    </header>
+
+    <main class="wrap layout">
+        <div class="col-build">
+            <section class="card" aria-labelledby="h-input">
+                <h2 id="h-input">1 · Pick tiles</h2>
+                <div id="modes" class="modes" role="radiogroup" aria-label="What a tile click adds"></div>
+                <p id="status" class="status" aria-live="polite"></p>
+                <div id="palette" class="palette"></div>
+            </section>
+
+            <section class="card" aria-labelledby="h-hand">
+                <h2 id="h-hand">2 · Your hand</h2>
+                <div class="hand-grid">
+                    <div>
+                        <h3>Melds <small>(click to remove)</small></h3>
+                        <div id="melds" class="tile-row"></div>
+                    </div>
+                    <div>
+                        <h3>Concealed tiles <small id="hand-count"></small></h3>
+                        <div id="hand" class="tile-row"></div>
+                    </div>
+                    <div>
+                        <h3>Winning tile</h3>
+                        <div id="win" class="tile-row"></div>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button id="clear" type="button" class="btn ghost">Clear all</button>
+                    <span class="sep"></span>
+                    <label for="example" class="small">Try an example</label>
+                    <select id="example"></select>
+                </div>
+            </section>
+
+            <section class="card" aria-labelledby="h-opts">
+                <h2 id="h-opts">3 · How was it won?</h2>
+                <div id="opts" class="opts"></div>
+            </section>
+        </div>
+
+        <aside class="col-result">
+            <section class="card sticky" aria-labelledby="h-res">
+                <h2 id="h-res">Result</h2>
+                <div id="result" aria-live="polite"></div>
+            </section>
+        </aside>
+    </main>
+
+    <footer class="wrap foot">
+        <p>
+            Learning project. Scoring follows the MCR 81-fan list with simplified exclusion rules. Check the official rules before relying on a score in a tournament.
+        </p>
+    </footer>
+
+    <script src="js/app.js"></script>
+    <script src="js/engine.js"></script>
 </body>
 </html>
