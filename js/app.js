@@ -172,7 +172,7 @@
 
     // render
     function renderModes() {
-        const box = $('#modes');
+        const box = $('#palette');
         box.innerHTML = '';
         for (const [id, label] of MODES) {
             const b = document.createElement('button')
@@ -222,7 +222,7 @@
     }
 
     renderers.push(renderModes, renderPalette);
-
+    
     function renderHand() {
         const melds = $('#melds');
         if (state.melds.length === 0) {
@@ -243,17 +243,197 @@
             b.appendChild(tileEl(t, 'span', { back }));
         });
         b.addEventListener('click', () => { state.melds.splice(idx, 1);state.msg = ''; render(); });
-        melds.appendchild(b);
+        melds.appendChild(b);
     });
 
     const hand = $('#hand');
     hand.innerHTML = '';
+    state.hand.forEach((t, idx) => {
+        const b = tileEl(t, 'button');
+        b.title = 'Remove ' + tileName(t);
+        b.addEventListener('click', () => {
+            state.hand.splice(idx, 1); state.mode = 'hand';
+            state.msg = '';
+            render();
+        });
+        hand.appendChild(b);
+    });
 
-    function render(){
-        renderers.forEach((draw) => draw());
+    for (let k = state.hand.length; k < cap(); k++) {
+        const s = document.createElement('span');
+        s.className = 'slot';
+        hand.appendChild(s);
+    }
+    $('#hand-count').textContent = '(' + state.hand.length + '/' + cap() + ', click to remove)';
+
+    const win = $('#win');
+    win.innerHTML = '';
+    if (state.win !== null) {
+      const b = tileEl(state.win, 'button');
+      b.title = 'Remove ' + tileName(state.win);
+      b.addEventListener('click', () => { state.win = null; state.mode = state.hand.length < cap() ? 'hand' : 'win'; render(); });
+      win.appendChild(b);
+    } else {
+      const s = document.createElement('span');
+      s.className = 'slot';
+      win.appendChild(s);
+    }
+}
+
+renderers.push(renderHand);
+$('#clear').addEventListener('click', clearAll);
+
+function optHTML(title, inner) {
+    return '<div class="opt"><span>' + title + '</span>' + inner + '</div>';
+  }
+  function windSelect(id, value) {
+    return '<select id="' + id + '">' + WIND_NAMES.map((n, k) => '<option value="' + k + '"' + (k === value ? ' selected' : '') + '>' + n + '</option>').join('') + '</select>';
+  }
+
+  function renderOpts() {
+    const s = state;
+    $('#opts').innerHTML =
+      optHTML('Win by',
+        '<label><input type="radio" name="how" value="self"' + (s.selfDrawn ? ' checked' : '') + '> Self-drawn</label>' +
+        '<label><input type="radio" name="how" value="discard"' + (!s.selfDrawn ? ' checked' : '') + '> Discard</label>') +
+      optHTML('Prevalent wind', windSelect('prevalent', s.prevalent)) +
+      optHTML('Seat wind', windSelect('seat', s.seat)) +
+      optHTML('Flower tiles', '<input id="flowers" type="number" min="0" max="8" value="' + s.flowers + '">') +
+      optHTML('Special circumstances',
+        '<label><input id="lastTile" type="checkbox"' + (s.lastTile ? ' checked' : '') + '> Last tile (4th copy of the winning tile)</label>' +
+        '<label><input id="lastOfWall" type="checkbox"' + (s.lastOfWall ? ' checked' : '') + '> Last tile of the wall (' + (s.selfDrawn ? 'draw' : 'discard') + ')</label>' +
+        '<label class="' + (s.selfDrawn ? '' : 'off') + '"><input id="replacement" type="checkbox"' + (s.replacement ? ' checked' : '') + (s.selfDrawn ? '' : ' disabled') + '> Out with replacement tile</label>' +
+        '<label class="' + (s.selfDrawn ? 'off' : '') + '"><input id="robbing" type="checkbox"' + (s.robbing ? ' checked' : '') + (s.selfDrawn ? ' disabled' : '') + '> Robbing the kong</label>');
+
+    document.querySelectorAll('input[name="how"]').forEach((el) => el.addEventListener('change', () => {
+      state.selfDrawn = el.value === 'self';
+      if (state.selfDrawn) state.robbing = false; else state.replacement = false;
+      render();
+    }));
+    $('#prevalent').addEventListener('change', (e) => { state.prevalent = +e.target.value; renderResult(); });
+    $('#seat').addEventListener('change', (e) => { state.seat = +e.target.value; renderResult(); });
+    $('#flowers').addEventListener('input', (e) => {
+      state.flowers = Math.max(0, Math.min(8, parseInt(e.target.value, 10) || 0));
+      renderResult();
+    });
+    for (const id of ['lastTile', 'lastOfWall', 'replacement', 'robbing']) {
+      $('#' + id).addEventListener('change', (e) => { state[id] = e.target.checked; renderResult(); });
+    }
+  }
+
+  renderers.push(renderOpts);
+
+      function esc(s) {
+    return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  }
+
+  function decompHTML(d) {
+    const labels = {
+      standard: 'Arrangement used',
+      knitted: 'Arrangement used (knitted straight)',
+      thirteenOrphans: 'Special hand',
+      sevenPairs: 'Special hand',
+      sevenShiftedPairs: 'Special hand',
+      greaterHonorsKnitted: 'Special hand',
+      lesserHonorsKnitted: 'Special hand',
+    };
+    const wrap = document.createElement('div');
+    wrap.className = 'decomp';
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = labels[d.kind] || 'Arrangement used';
+    wrap.appendChild(label);
+    const row = document.createElement('div');
+    row.className = 'tile-row';
+    if (d.groups.length) {
+      d.groups.forEach((g) => {
+        const grp = document.createElement('span');
+        grp.className = 'grp';
+        g.tiles.forEach((t, k) => grp.appendChild(tileEl(t, 'span', { back: g.type === 'kong' && g.concealedKong && (k === 0 || k === 3) })));
+        row.appendChild(grp);
+      });
+      if (d.pair) {
+        const grp = document.createElement('span');
+        grp.className = 'grp';
+        d.pair.forEach((t) => grp.appendChild(tileEl(t, 'span')));
+        row.appendChild(grp);
+      }
+    } else {
+      (d.tiles || []).forEach((t) => row.appendChild(tileEl(t, 'span')));
+    }
+    wrap.appendChild(row);
+    return wrap;
+  }
+
+  function renderResult() {
+    const box = $('#result');
+    box.innerHTML = '';
+    const ready = state.win !== null && state.hand.length === cap();
+    if (!ready) {
+      const need = cap() - state.hand.length + (state.win === null ? 1 : 0);
+      const p = document.createElement('p');
+      p.className = 'empty';
+      p.textContent = 'Add ' + need + ' more tile' + (need === 1 ? '' : 's') + ' to complete the hand (' + (state.hand.length + (state.win !== null ? 1 : 0)) + '/' + (cap() + 1) + ').';
+      box.appendChild(p);
+      return;
+    }
+    const r = score({
+      melds: state.melds,
+      hand: state.hand,
+      win: state.win,
+      selfDrawn: state.selfDrawn,
+      prevalent: state.prevalent,
+      seat: state.seat,
+      flowers: state.flowers,
+      lastTile: state.lastTile,
+      lastOfWall: state.lastOfWall,
+      replacement: state.replacement,
+      robbing: state.robbing,
+    });
+    if (!r.valid) {
+      const p = document.createElement('p');
+      p.className = 'err';
+      p.textContent = r.error;
+      box.appendChild(p);
+      return;
+    }
+    const head = document.createElement('div');
+    head.innerHTML =
+      '<div class="total"><strong>' + r.total + '</strong><span>fan' + (r.flowers ? ' (including ' + r.flowers + ' flower' + (r.flowers === 1 ? '' : 's') + ')' : '') + '</span></div>' +
+      '<span class="chip ' + (r.meetsMinimum ? 'ok' : 'bad') + '">' +
+      (r.meetsMinimum ? 'Valid win (8+ fan)' : 'Only ' + r.base + ' fan without flowers: needs 8 to win') + '</span>';
+    box.appendChild(head);
+
+    const rows = r.fans.map((f) =>
+      '<tr><td>' + esc(f.name) + '<span class="zh">' + esc(f.zh) + '</span>' +
+      (f.count > 1 && f.id !== 'flowers' ? ' <span class="mult">× ' + f.count + '</span>' : '') +
+      (f.id === 'flowers' ? ' <span class="mult">× ' + f.count + '</span>' : '') +
+      '</td><td class="pts">' + f.points + '</td></tr>').join('');
+    const table = document.createElement('table');
+    table.className = 'fans';
+    table.innerHTML = '<tbody>' + rows + '</tbody><tfoot><tr><td>Total</td><td class="pts">' + r.total + '</td></tr></tfoot>';
+    box.appendChild(table);
+    box.appendChild(decompHTML(r.decomposition));
+  }
+
+  renderers.push(renderResult);
+
+    function renderExamples() {
+    const sel = $('#example');
+    sel.innerHTML = '<option value="">Choose…</option>' + EXAMPLES.map((e, k) => '<option value="' + k + '">' + esc(e.name) + '</option>').join('');
+    sel.onchange = () => {
+      if (sel.value !== '') loadExample(EXAMPLES[+sel.value]);
+      sel.value = '';
+    };
+  }
+
+  renderExamples();
+
+function render(){
+    renderers.forEach((draw) => draw());
     }
 
-    render();
+render();
 
 })();
 
