@@ -285,3 +285,34 @@ table.fans { width: 100%; border-collapse: collapse; font-size: .9rem; }
   .tile .t-top { font-size: 1.4rem; }
   .tile .t-bot { font-size: 1rem; }
 }
+
+.tile {
+    background :url("../assets/tiles/Front.svg") center / 100% 100% no-repeat;
+    border: 0;
+}
+
+.tile .face {
+    position: absolute;
+    inset: 12% 10% 18% 10%;
+    width: 80%;
+    height: 70%;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.tile.back {
+    background: url("../assets/tiles/Back.svg") center / 100% 100% no-repeat;
+    filter: saturate(.55) brightness(.85);
+}
+
+.tile.back .face{ display: none; }
+
+.haku-frame {
+    position: absolute;
+    inset: 16% 18% 22% 18%;
+    border: 3px solid var(--c-p);
+    border-radius: 3px;
+    pointer-events: none;
+}
+
+.tile.back .haku-frame{ display: none; }

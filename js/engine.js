@@ -370,7 +370,7 @@
     // chow combinations
     if(chowIdx.length === 4) {
       const n = sortedN(chowIdx);
-      if(chowIdx.every((i) => cs(i) === cs(chowIdx[0]) && cn(i) === cn(chowIdx[0]))) add('quadrupleChow', { uses: chowIdex});
+      if(chowIdx.every((i) => cs(i) === cs(chowIdx[0]) && cn(i) === cn(chowIdx[0]))) add('quadrupleChow', { uses: chowIdx});
       if (sameSuit(chowIdx) && (run(n, 1) || run(n, 2))) add('fourPureShiftedChows', { uses: chowIdx });
       if (sameSuit(chowIdx) && isSuit(pair) && suitOf(pair) === cs(chowIdx[0]) && numOf(pair) === 5 && n.join() === '1,1,7,7') {
         add('pureTerminalChows', { uses: chowIdx });

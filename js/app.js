@@ -47,35 +47,32 @@
     const cap = () => 13 - 3 * state.melds.length; // maximum hand size
     const renderers= []; //everything that draws the page
 
-    // tiles
-    function glyph(i) { // chinese characters to go with tiles
-        if (i < 27) return [String((i % 9) + 1), ['萬', '筒', '索'][Math.floor(i / 9)]];
-        return [['東', '南', '西', '北', '中', '發', ''][i - 27], ''];
-    }
+    // tile number -> the picture file in assets/tiles
+    const TILE_FILES = [];
+    for (let n = 1; n <= 9; n++) TILE_FILES.push('Man' + n);
+    for (let n = 1; n <= 9; n++) TILE_FILES.push('Pin' + n);
+    for (let n = 1; n <= 9; n++) TILE_FILES.push('Sou' + n);
+    TILE_FILES.push('Ton', 'Nan', 'Shaa', 'Pei', 'Chun', 'Hatsu', 'Haku');
 
-    function tileClass(i) {
-        if (i < 27) return 's-' + 'mps'[Math.floor(i / 9)];
-        if (i < 31) return 'wind';
-        return ['d-r', 'd-g', 'd-w'][i - 31];
-    }
-
-    function tileEl(i, tag, opts) { // box with real tiles
+    function tileEl(i, tag, opts) { // tile drawn from pictures
         opts = opts || {};
         const el = document.createElement(tag || 'span');
-        el.className = 'tile ' + tileClass(i) + (opts.back ? ' back' : '');
+        el.className = 'tile ' + (opts.back ? ' back' : '');
         if (tag === 'button') el.type = 'button';
         el.setAttribute('aria-label', tileName(i));
         el.title = tileName(i);
-        const g = glyph(i);
-        const top = document.createElement('span');
-        top.className = 't-top';
-        top.textContent = g[0];
-        el.appendChild(top);
-        if (g[1]) {
-            const bot = document.createElement('span');
-            bot.className = 't-bot';
-            bot.textContent = g[1];
-            el.appendChild(bot);
+        if (!opts.back) {
+          const img = document.createElement('img');
+          img.className = 'face';
+          img.src = 'assets/tiles/' + TILE_FILES[i] + '.svg';
+          img.alt = '';
+          img.draggable = 'false';
+          el.appendChild(img);
+          if(i === 33) { // white dragon is a blank tile, adding blue frame for clarity.
+            const frame = document. createElement('span');
+            frame.className = 'haku-frame';
+            el.appendChild(frame);
+          }
         }
         return el;
     }
@@ -225,6 +222,7 @@
     
     function renderHand() {
         const melds = $('#melds');
+        melds.innerHTML = '';
         if (state.melds.length === 0) {
             const p = document.createElement('span');
             p.className = 'small';
@@ -236,7 +234,7 @@
         b.type = 'button';
         b.className = 'meld';
         b.title = 'Remove this meld';
-        b.setAttribute('aria-label', 'Remove' + (m.concealed ? 'concealed ' : '') + m.type + ' of ' + tileName(m.tile));
+        b.setAttribute('aria-label', 'Remove ' + (m.concealed ? 'concealed ' : '') + m.type + ' of ' + tileName(m.tile));
         const tiles = m.type === 'chow' ? [m.tile, m.tile + 1, m.tile + 2] : m.type === 'pung' ? [m.tile, m.tile, m.tile] : [m.tile, m.tile, m.tile, m.tile];
         tiles.forEach((t, k) => {
             const back = m.type === 'kong' && m.concealed && (k === 0 || k === 3);
@@ -252,7 +250,8 @@
         const b = tileEl(t, 'button');
         b.title = 'Remove ' + tileName(t);
         b.addEventListener('click', () => {
-            state.hand.splice(idx, 1); state.mode = 'hand';
+            state.hand.splice(idx, 1); 
+            if (state.mode === 'win' && state.win !== null) state.mode = 'hand';
             state.msg = '';
             render();
         });
