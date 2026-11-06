@@ -361,3 +361,10 @@ table.fans { width: 100%; border-collapse: collapse; font-size: .9rem; }
 .btn.act.danger { color: var(--bad); }
 .mini { display: inline-flex; gap: 1px; }
 .mini .tile { --tile-w: 22px; --tile-h: 30px; border-radius: 3px; }
+
+/* flower tiles */
+.palette .row.flowers-row { 
+    margin-top: 6px; 
+    padding-top: 8px; 
+    border-top: 1px dashed var(--line); 
+}

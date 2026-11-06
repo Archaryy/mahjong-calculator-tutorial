@@ -12,7 +12,7 @@
         selfDrawn: false,
         prevalent: 0,
         seat: 0,
-        flowers: 0,
+        flowers: [], // flower tiles you hold: 0 to 7
         lastTile: false,
         lastOfWall: false,
         replacement: false,
@@ -53,14 +53,14 @@
         el.className = 'tile ' + (opts.back ? ' back' : '');
         if (tag === 'button') el.type = 'button';
         const name = i < 34 ? tileName(i) : FLOWER_NAMES[i - 34] + ' flower';
-        el.setAttribute('aria-label', tileName(i));
-        el.title = tileName(i);
+        el.setAttribute('aria-label', name);
+        el.title = name;
         if (!opts.back) {
           const img = document.createElement('img');
           img.className = 'face';
           img.src = 'assets/tiles/' + TILE_FILES[i] + '.png';
           img.alt = '';
-          img.draggable = 'false';
+          img.draggable = false;
           el.appendChild(img);
         }
         return el;
@@ -205,13 +205,28 @@
         render();
     }
 
+    // new flower design*
+    function addFlower(k) { // flower tile tapped in the palette
+      if(!state.flowers.includes(k)) {
+        state.flowers.push(k);
+        state.flowers.sort((a, b) => a - b);
+      }
+      state.msg = '';
+      render();
+    }
+    
+    function removeFlower(k) { // flower tile tapped in the flowers row
+      state.flowers = state.flowers.filter((f) => f !== k)
+        render();
+    }
+
     function loadExample(ex) {
         state.melds = (ex.melds || []).map(([type, t, c]) => ({ type, tile: parseTiles(t)[0], concealed: !!c}));
         state.hand = parseTiles(ex.hand).sort((a, b) => a - b);
         state.win = parseTiles(ex.win)[0];
         state.selfDrawn = !!ex.selfDrawn;
         state.lastTile = state.lastOfWall = state.replacement = state.robbing = false;
-        state.flowers = 0;
+        state.flowers = [];
         state.sel = null;
         state.msg = '';
         render();
@@ -221,6 +236,7 @@
         state.melds = [];
         state.hand = [];
         state.win = null;
+        state.flowers= [];
         state.sel = null;
         state.msg = '';
         render();
@@ -248,19 +264,26 @@
         Array.from({ length: 9}, (_, k) => 9 + k),
         Array.from({ length: 9}, (_, k) => 18 + k),
         Array.from({ length: 7}, (_, k) => 27 + k),
+        Array.from({ length: 8}, (_, k) => 34 + k), // flowers
       ];
       for (const row of rows) {
         const r = document.createElement('div');
-        r.className = 'row';
+        r.className = row[0] >= 34 ? 'row flowers-row' : 'row';
         for (const i of row) {
           const b = tileEl(i, 'button');
-          const left = 4 - u[i];
-          const badge  = document.createElement('span');
-          badge.className = 'left';
-          badge.textContent = left;
-          b.appendChild(badge);
-          b.disabled = left === 0;
-          b.addEventListener('click', () => pick(i));
+          if (i >= 34) { // flower (only one of each exists)
+            b.disabled = state.flowers.includes(i - 34);
+            b.addEventListener('click', () => addFlower(i - 34));
+          }
+          else {
+            const left = 4 - u[i];
+            const badge  = document.createElement('span');
+            badge.className = 'left';
+            badge.textContent = left;
+            b.appendChild(badge);
+            b.disabled = left === 0;
+            b.addEventListener('click', () => pick(i));
+          }
           r.appendChild(b);
         }
         box.appendChild(r);
@@ -402,6 +425,26 @@
 
     renderers.push(renderHand, renderActions);
 
+    // render the flowers you hold
+    function renderFlowers() {
+      const box = $('#flowers');
+      box.innerHTML = '';
+      if (state.flowers.length === 0) {
+        const p = document.createElement('span');
+        p.className = 'small';
+        p.textContent = 'None. Tap a flower tile above if you hold any (1 fan each).';
+        box.appendChild(p);
+      }
+      state.flowers.forEach((k) => {
+        const b = tileEl(34 + k, 'button');
+        b.addEventListener('click', () => removeFlower(k));
+        box.appendChild(b);
+      });
+      $('#flower-count').textContent = '(' + state.flowers.length + ' of 8, tap to remove)';
+    }
+
+    renderers.push(renderFlowers);
+
     $('#clear').addEventListener('click', clearAll);
 
     function optHTML(title, inner) {
@@ -419,7 +462,6 @@
           '<label><input type="radio" name="how" value="discard"' + (!s.selfDrawn ? ' checked' : '') + '> Discard</label>') +
         optHTML('Prevalent wind', windSelect('prevalent', s.prevalent)) +
         optHTML('Seat wind', windSelect('seat', s.seat)) +
-        optHTML('Flower tiles', '<input id="flowers" type="number" min="0" max="8" value="' + s.flowers + '">') +
         optHTML('Special circumstances',
           '<label><input id="lastTile" type="checkbox"' + (s.lastTile ? ' checked' : '') + '> Last tile (4th copy of the winning tile)</label>' +
           '<label><input id="lastOfWall" type="checkbox"' + (s.lastOfWall ? ' checked' : '') + '> Last tile of the wall (' + (s.selfDrawn ? 'draw' : 'discard') + ')</label>' +
@@ -433,10 +475,6 @@
       }));
       $('#prevalent').addEventListener('change', (e) => { state.prevalent = +e.target.value; renderResult(); });
       $('#seat').addEventListener('change', (e) => { state.seat = +e.target.value; renderResult(); });
-      $('#flowers').addEventListener('input', (e) => {
-        state.flowers = Math.max(0, Math.min(8, parseInt(e.target.value, 10) || 0));
-        renderResult();
-      });
       for (const id of ['lastTile', 'lastOfWall', 'replacement', 'robbing']) {
         $('#' + id).addEventListener('change', (e) => { state[id] = e.target.checked; renderResult(); });
       }
@@ -515,7 +553,7 @@
         selfDrawn: state.selfDrawn,
         prevalent: state.prevalent,
         seat: state.seat,
-        flowers: state.flowers,
+        flowers: state.flowers.length,
         lastTile: state.lastTile,
         lastOfWall: state.lastOfWall,
         replacement: state.replacement,
@@ -563,7 +601,9 @@
     function render(){
         renderers.forEach((draw) => draw());
     }
-
+    document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { state.sel = null; render(); }
+    });
   render();
 
 })();
