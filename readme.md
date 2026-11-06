@@ -23,7 +23,7 @@ node tests/engine.test.js
 ```
 index.html          page skeleton
 css/style.css       styling
-assets/tiles/       SVG tile artwork (CC0)
+assets/tiles/       PNG tile artwork (CC0)
 js/engine.js        scoring engine (pure functions, no DOM, works in browser and Node)
 js/app.js           UI: state, tile picker, rendering
 tests/engine.test.js  unit tests for the engine
