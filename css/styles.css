@@ -316,3 +316,30 @@ table.fans { width: 100%; border-collapse: collapse; font-size: .9rem; }
 }
 
 .tile.back .haku-frame{ display: none; }
+
+/* real tile pictures (fixed one) */
+
+.tile {
+    background: none;
+    border: 0;
+}
+
+.tile .face {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.tile.back {
+    background: var(--tile-back);
+    border: 1px solid #144d3e;
+    border-bottom-width: 4px;
+    border-radius: 6px;
+}
+
+.tile.back .face{
+    display: none;
+}

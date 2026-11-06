@@ -49,30 +49,28 @@
 
     // tile number -> the picture file in assets/tiles
     const TILE_FILES = [];
-    for (let n = 1; n <= 9; n++) TILE_FILES.push('Man' + n);
-    for (let n = 1; n <= 9; n++) TILE_FILES.push('Pin' + n);
-    for (let n = 1; n <= 9; n++) TILE_FILES.push('Sou' + n);
-    TILE_FILES.push('Ton', 'Nan', 'Shaa', 'Pei', 'Chun', 'Hatsu', 'Haku');
+    for (let n = 1; n <= 9; n++) TILE_FILES.push(n + 'm');
+    for (let n = 1; n <= 9; n++) TILE_FILES.push(n + 'p');
+    for (let n = 1; n <= 9; n++) TILE_FILES.push(n + 's');
+    for (let n = 1; n <= 7; n++) TILE_FILES.push('z' + n);
+    for (let n = 1; n <= 8; n++) TILE_FILES.push('f' + n);
+    const FLOWER_NAMES = ['Spring', 'Summer', 'Autumn', 'Winter', 'Plum', 'Orchid', 'Bamboo', 'Chrysanthemum'];
 
     function tileEl(i, tag, opts) { // tile drawn from pictures
         opts = opts || {};
         const el = document.createElement(tag || 'span');
         el.className = 'tile ' + (opts.back ? ' back' : '');
         if (tag === 'button') el.type = 'button';
+        const name = i < 34 ? tileName(i) : FLOWER_NAMES[i - 34] + ' flower';
         el.setAttribute('aria-label', tileName(i));
         el.title = tileName(i);
         if (!opts.back) {
           const img = document.createElement('img');
           img.className = 'face';
-          img.src = 'assets/tiles/' + TILE_FILES[i] + '.svg';
+          img.src = 'assets/tiles/' + TILE_FILES[i] + '.png';
           img.alt = '';
           img.draggable = 'false';
           el.appendChild(img);
-          if(i === 33) { // white dragon is a blank tile, adding blue frame for clarity.
-            const frame = document. createElement('span');
-            frame.className = 'haku-frame';
-            el.appendChild(frame);
-          }
         }
         return el;
     }
