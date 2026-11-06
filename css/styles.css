@@ -343,3 +343,21 @@ table.fans { width: 100%; border-collapse: collapse; font-size: .9rem; }
 .tile.back .face{
     display: none;
 }
+
+/* hand design */
+.status.hint { color: var(--muted); }
+.tile.selected { transform: translateY(-6px); outline: 3px solid var(--accent); outline-offset: 1px; border-radius: 6px; }
+
+.meld { flex-direction: column; align-items: center; gap: 2px; }
+.meld-set { display: inline-flex; gap: 1px; }
+.meld .tile { --tile-w: 34px; --tile-h: 46px; }
+.meld-tag { width: 100%; text-align: center; font-size: .65rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+#melds { align-items: flex-start; }
+
+.tile-actions { min-height: 48px; padding: 10px 12px; background: #fff; border: 1px dashed var(--line); border-radius: 10px; }
+.sel-title { font-weight: 700; margin-bottom: 8px; }
+.act-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn.act { display: inline-flex; align-items: center; gap: 8px; }
+.btn.act.danger { color: var(--bad); }
+.mini { display: inline-flex; gap: 1px; }
+.mini .tile { --tile-w: 22px; --tile-h: 30px; border-radius: 3px; }

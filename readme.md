@@ -69,7 +69,7 @@ a fan reference page, other rulesets behind the same `score()` interface.
 - **Inspiration:** the idea and general layout were inspired by [mahjongcalculators.com/mcr](https://mahjongcalculators.com/mcr/). No code or assets were copied from that site.
 - **Fan names and point values:** follow the standard 81-fan Mahjong Competition Rules (MCR, 国标麻将) list, as published in the [MCR Rulebook 2006](https://mahjong.dk/hubfs/Mahjong%20documents/MCR/MCR_Rulebook_2006.pdf) (World Mahjong Organization / European Mahjong Association rules). Flower tiles add 1 each.
 - **Exclusion rules and edge cases:** written from memory of the commonly published tables and simplified. Check them against the official rulebook before trusting a score.
-- **Tile artwork:** [FluffyStuff/riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles), released into the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). Credit is not required, but is given here. The files are in `assets/tiles/`.
+- **Tile artwork**: mahjong-tiles by zddd312 (https://github.com/zddd312/mahjong-tiles), released under the M+ font licence terms: free to use, copy, distribute and modify, commercially or not, provided "as is" (the licence text is in assets/tiles/LICENSE). The set is put together from lietxia/mahjong_graphic (https://github.com/lietxia/mahjong_graphic) and the I.Mahjong font by 內木一郎 (https://github.com/SyaoranHinata/I.Mahjong). The pictures are in assets/tiles.
 
 
 ## What I (the author) learned

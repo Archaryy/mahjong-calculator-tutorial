@@ -8,7 +8,7 @@
         melds : [], // {type:'chow'|'pung'|'kong', tile, concealed}
         hand : [], // concealed tiles, without the winning tile
         win: null,
-        mode: 'hand', // hand | win | chow | pung | kong | concealedKong
+        sel : null, // selected tile : {zone : 'hand', idx} or {zone: win}
         selfDrawn: false,
         prevalent: 0,
         seat: 0,
@@ -19,15 +19,6 @@
         robbing: false,
         msg: '',
     };
-
-    const MODES = [
-        ['hand', 'Hand tile'],
-        ['win', 'Winning tile'],
-        ['chow', 'Chow'],
-        ['pung', 'Pung'],
-        ['kong', 'Kong'],
-        ['concealedKong', 'Concealed kong'],
-    ];
 
     const EXAMPLES = [
         { name: 'Chicken Hand (8 fan)', melds: [['chow', '2m'], ['chow', '3p'], ['chow', '6s']], hand: '45m77z', win: '6m'},
@@ -90,59 +81,129 @@
         return u;
     }
 
-    // actions
-    function pick(i) { // when clicking tile depending on the mode (adding or removing or adding to meld)
-        const u = usage();
+    // new design
+    function inHand() { // how many of each tile are loose in the hand
+      const c = new Array(34).fill(0);
+      state.hand.forEach((t) => c[t]++);
+      return c;
+    }
+
+    const total = () => state.hand.length + (state.win !== null ? 1 : 0);
+
+    function quads() {
+      const have = inHand();
+      if (state.win !== null) have[state.win]++;
+      const list = [];
+      for (let t = 0; t < 34; t++) {
+        if (have[t] === 4) list.push(t);
+      }
+      return list;
+    }
+
+    // most tile the hand may hold : the normal size, plus one extra for each four of a kind.
+    const maxTotal = () => cap() + 1 + Math.min(quads().length, 4 - state.melds.length);
+
+    function chowOptions(t) { // every chow you could make that includes tile t
+      if (t >= 27) return [];
+      const have = inHand();
+      const found = [];
+      for (let s = t - 2; s <= t; s++) {
+        if (s < 0 || s % 9 > 6) continue; // a chow cannot start on 8 or 9
+        if (Math.floor(s / 9) !== Math.floor(t / 9)) continue; //must be in one suit
+        if (have[s] && have[s + 1] && have[s + 2]) found.push(s);
+      }
+      return found;
+    }
+
+    function removeFromHand(tile, n) { // take n copies of tile out of hand
+      for (let k = 0; k < n; k++) state.hand.splice(state.hand.indexOf(tile), 1);
+    }
+
+    // actions new design*
+    function pick(i) { // a tile clicked in the palette: add it to the hand
         state.msg = '';
-        const mode = state.mode;
-        if (mode === 'hand') {
-            if (state.hand.length >= cap()) {
-                state.msg = 'The hand is full. Choose the winning tile, or click a tile to remove it.';
-                state.mode = 'win';
-            }
-            else if (u[i] >= 4) {
-                state.msg = 'All four copies of that tile are already used.';
-            }
-            else {
-                state.hand.push(i);
-                state.hand.sort((a, b) => a - b);
-                if (state.hand.length >= cap()) state.mode = 'win';
-            }
+        state.sel = null;
+        const u = usage();
+        if (u[i] >= 4) {
+            state.msg = 'All four copies of that tile are already used.';
         }
-        else if (mode === 'win') {
-            if (state.win !== null) u[state.win]--;
-            if (u[i] >= 4) {
-                state.msg = 'All four copies of that tile are already used.';
-            }
-            else {
-                state.win = i;
-                if (state.hand.length < cap()) state.mode = 'hand';
-            }
+        else if (total() >= maxTotal()) {
+            state.msg = 'The hand is full (' + (cap() + 1) + ' tiles). Tap a tile to remove it' +
+                (quads().length ? ', or turn your four of a kind into a kong to make room.' : '.');
         }
         else {
-            addMeld(mode, i, u);
+            state.hand.push(i);
+            state.hand.sort((a, b) => a - b);
+            // the tile that fills the hand is the winning tile
+            if (state.win === null && total() === cap() + 1 && quads().length === 0) {
+                removeFromHand(i, 1);
+                state.win = i;
+                state.msg = 'The last tile you added is the winning tile. Tap any tile to change that.';
+            }
         }
         render();
     }
 
-    function addMeld(mode, i, u) {
-    if (state.melds.length >= 4) { state.msg = 'A hand has at most four melds.'; return; }
-    if (state.hand.length > 13 - 3 * (state.melds.length + 1)) {
-      state.msg = 'Remove some concealed tiles first. A new meld leaves room for ' + (13 - 3 * (state.melds.length + 1)) + '.';
-      return;
+    function makeMeld(type, tile, concealed) { // turn tiles from the hand into a declared set
+        if (state.melds.length >= 4) { state.msg = 'A hand has at most four melds.'; render(); return; }
+        const set = type === 'chow' ? [tile, tile + 1, tile + 2]
+            : type === 'pung' ? [tile, tile, tile]
+            : [tile, tile, tile, tile];
+        set.forEach((t) => removeFromHand(t, 1));
+        state.melds.push({ type: type, tile: tile, concealed: !!concealed });
+        state.melds.sort((a, b) => a.tile - b.tile);
+        state.sel = null;
+        state.msg = '';
+        render();
     }
-    if (mode === 'chow') {
-      if (i >= 27 || (i % 9) > 6) { state.msg = 'A chow needs a numbered tile from 1 to 7 as its lowest tile.'; return; }
-      if (u[i] >= 4 || u[i + 1] >= 4 || u[i + 2] >= 4) { state.msg = 'Not enough copies left for that chow.'; return; }
-      state.melds.push({ type: 'chow', tile: i, concealed: false });
-    } else if (mode === 'pung') {
-      if (u[i] > 1) { state.msg = 'Not enough copies left for a pung.'; return; }
-      state.melds.push({ type: 'pung', tile: i, concealed: false });
-    } else {
-      if (u[i] > 0) { state.msg = 'A kong needs all four copies of the tile.'; return; }
-      state.melds.push({ type: 'kong', tile: i, concealed: mode === 'concealedKong' });
+
+    function makeWin() { // the selected hand tile becomes the winning tile
+        const s = state.sel;
+        if (!s || s.zone !== 'hand') return;
+        const t = state.hand[s.idx];
+        state.hand.splice(s.idx, 1);
+        if (state.win !== null) {            // the old winning tile goes back into the hand
+            state.hand.push(state.win);
+            state.hand.sort((a, b) => a - b);
+        }
+        state.win = t;
+        state.sel = null;
+        state.msg = '';
+        render();
     }
-  }
+
+    function winToHand() { // the winning tile goes back into the hand
+        if (state.win === null) return;
+        state.hand.push(state.win);
+        state.hand.sort((a, b) => a - b);
+        state.win = null;
+        state.sel = null;
+        state.msg = '';
+        render();
+    }
+
+    function removeSelected() { // throw the selected tile away
+        const s = state.sel;
+        if (!s) return;
+        if (s.zone === 'hand') state.hand.splice(s.idx, 1);
+        else state.win = null;
+        state.sel = null;
+        state.msg = '';
+        render();
+    }
+
+    function breakMeld(idx) { // undo a declared set: its tiles go back into the hand
+        const m = state.melds[idx];
+        const tiles = m.type === 'chow' ? [m.tile, m.tile + 1, m.tile + 2]
+            : m.type === 'pung' ? [m.tile, m.tile, m.tile]
+            : [m.tile, m.tile, m.tile, m.tile];
+        state.melds.splice(idx, 1);
+        state.hand.push(...tiles);
+        state.hand.sort((a, b) => a - b);
+        state.sel = null;
+        state.msg = '';
+        render();
+    }
 
     function loadExample(ex) {
         state.melds = (ex.melds || []).map(([type, t, c]) => ({ type, tile: parseTiles(t)[0], concealed: !!c}));
@@ -151,7 +212,7 @@
         state.selfDrawn = !!ex.selfDrawn;
         state.lastTile = state.lastOfWall = state.replacement = state.robbing = false;
         state.flowers = 0;
-        state.mode = 'hand';
+        state.sel = null;
         state.msg = '';
         render();
     }
@@ -160,260 +221,333 @@
         state.melds = [];
         state.hand = [];
         state.win = null;
-        state.mode = 'hand';
+        state.sel = null;
         state.msg = '';
         render();
     }
 
-    // render
-    function renderModes() {
-        const box = $('#palette');
-        box.innerHTML = '';
-        for (const [id, label] of MODES) {
-            const b = document.createElement('button')
-            b.type = 'button';
-            b.className = 'mode';
-            b. setAttribute('role', 'radio');
-            b.setAttribute('aria-checked', String(state.mode === id));
-            b.textContent = label;
-            b.addEventListener('click', () => { state.mode = id; state.msg = ''; render(); });
-            box.appendChild(b);
-        }
+    // render new design*
+    function hintText() { // grey help line above the palette
+      if (state.msg) return state.msg;
+      const q = quads();
+      if (q.length && state.melds.length < 4) {
+        return 'You hold all four ' + tileName(q[0]) + '. Tap one in your hand to declare it as a kong';
+      }
+      if (total() === 0 && state.melds.length === 0) {
+        return 'Tap tiles to build your hand. Then tap a tile in it to make a chow, pung or kong.';
+      }
+      return '';
     }
 
     function renderPalette() {
-        const u = usage();
-        const box = $('#modes');
-        box.innerHTML = '';
-        const rows = [
-            Array.from({ length : 9}, (_, k) => k),
-            Array.from({ length : 9}, (_, k) => 9 + k),
-            Array.from({ length : 9}, (_, k) => 18 + k),
-            Array.from({ length : 7}, (_, k) => 27 + k),
-        ];
-        const meldMode = ['chow', 'pung', 'kong', 'concealedKong'].includes(state.mode);
-        for (const row of rows) {
-            const r = document.createElement('div');
-            r.className = 'row';
-            for (const i of row) {
-                const b = tileEl(i, 'button');
-                const left = 4 - u[i];
-                const left_el = document.createElement('span');
-                left_el.className = 'left';
-                left_el.textContent = left;
-                b.appendChild(left_el);
-                let disabled = left === 0 && !(state.mode === 'win' && state.win === i);
-                if (state.mode === 'chow' && (i >= 27 || i % 9 > 6)) disabled = true;
-                if (state.mode === 'kong' || state.mode === 'concealedKong') disabled = left < 4; 
-                if (state.mode === 'pung') disabled = left < 3;
-                if (meldMode && state.melds.length >= 4) disabled = true;
-                b.disabled = disabled;
-                b.addEventListener('click', () => pick(i));
-                r.appendChild(b);
-            }
-            box.appendChild(r);
+      const u = usage();
+      const box = $('#palette');
+      box.innerHTML = '';
+      const rows = [
+        Array.from({ length: 9}, (_, k) => k),
+        Array.from({ length: 9}, (_, k) => 9 + k),
+        Array.from({ length: 9}, (_, k) => 18 + k),
+        Array.from({ length: 7}, (_, k) => 27 + k),
+      ];
+      for (const row of rows) {
+        const r = document.createElement('div');
+        r.className = 'row';
+        for (const i of row) {
+          const b = tileEl(i, 'button');
+          const left = 4 - u[i];
+          const badge  = document.createElement('span');
+          badge.className = 'left';
+          badge.textContent = left;
+          b.appendChild(badge);
+          b.disabled = left === 0;
+          b.addEventListener('click', () => pick(i));
+          r.appendChild(b);
         }
-        $('#status').textContent = state.msg;
+        box.appendChild(r);
+      }
+      const st = $('#status');
+      st.textContent = hintText();
+      st.className = 'status' + (state.msg ? '' : ' hint');
     }
 
-    renderers.push(renderModes, renderPalette);
-    
+    renderers.push(renderPalette);
+
+    // render : buttons under hand
+    function actionBtn(label, tiles, onClick, extra) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn act' + (extra ? ' ' + extra : '');
+        if (tiles) {
+            const strip = document.createElement('span');
+            strip.className = 'mini';
+            tiles.forEach((t, k) => strip.appendChild(tileEl(t, 'span', { back: extra === 'conc' && (k === 0 || k === 3) })));
+            b.appendChild(strip);
+        }
+        b.appendChild(document.createTextNode(label));
+        b.addEventListener('click', onClick);
+        return b;
+    }
+
+    function renderActions() { // new action layout
+        const box = $('#tile-actions');
+        box.innerHTML = '';
+        const s = state.sel;
+        if (!s) {
+            const p = document.createElement('span');
+            p.className = 'small';
+            p.textContent = state.hand.length ? 'Tap a tile in your hand to see what you can do with it.' : '';
+            box.appendChild(p);
+            return;
+        }
+        const t = s.zone === 'win' ? state.win : state.hand[s.idx];
+        const title = document.createElement('div');
+        title.className = 'sel-title';
+        title.textContent = tileName(t) + (s.zone === 'win' ? ' (winning tile)' : '');
+        box.appendChild(title);
+
+        const row = document.createElement('div');
+        row.className = 'act-row';
+        if (s.zone === 'hand') {
+            const have = inHand();
+            chowOptions(t).forEach((st) => row.appendChild(actionBtn('Chow', [st, st + 1, st + 2], () => makeMeld('chow', st))));
+            if (have[t] >= 3) row.appendChild(actionBtn('Pung', [t, t, t], () => makeMeld('pung', t)));
+            if (have[t] >= 4) {
+                row.appendChild(actionBtn('Open kong', [t, t, t, t], () => makeMeld('kong', t, false)));
+                row.appendChild(actionBtn('Concealed kong', [t, t, t, t], () => makeMeld('kong', t, true), 'conc'));
+            }
+            row.appendChild(actionBtn(state.win === null ? 'This is the winning tile' : 'Make this the winning tile', null, makeWin));
+            row.appendChild(actionBtn('Remove', null, removeSelected, 'danger'));
+        }
+        else {
+            row.appendChild(actionBtn('Put back in hand', null, winToHand));
+            row.appendChild(actionBtn('Remove', null, removeSelected, 'danger'));
+        }
+        box.appendChild(row);
+    }
+
+    // render: declared sets, the hand and the winning tile
     function renderHand() {
         const melds = $('#melds');
         melds.innerHTML = '';
         if (state.melds.length === 0) {
             const p = document.createElement('span');
             p.className = 'small';
-            p.textContent = 'None. Use the Chow / Pung / Kong buttons above to add a claimed or declared meld.';
+            p.textContent = 'None yet. Pick tiles below, then tap them to form a chow, pung or kong.';
             melds.appendChild(p);
-    }
-    state.melds.forEach((m, idx) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'meld';
-        b.title = 'Remove this meld';
-        b.setAttribute('aria-label', 'Remove ' + (m.concealed ? 'concealed ' : '') + m.type + ' of ' + tileName(m.tile));
-        const tiles = m.type === 'chow' ? [m.tile, m.tile + 1, m.tile + 2] : m.type === 'pung' ? [m.tile, m.tile, m.tile] : [m.tile, m.tile, m.tile, m.tile];
-        tiles.forEach((t, k) => {
-            const back = m.type === 'kong' && m.concealed && (k === 0 || k === 3);
-            b.appendChild(tileEl(t, 'span', { back }));
+        }
+        state.melds.forEach((m, idx) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'meld';
+            b.title = 'Tap to put these tiles back in your hand';
+            b.setAttribute('aria-label', 'Undo ' + (m.concealed ? 'concealed ' : '') + m.type + ' of ' + tileName(m.tile));
+            const tiles = m.type === 'chow' ? [m.tile, m.tile + 1, m.tile + 2]
+                : m.type === 'pung' ? [m.tile, m.tile, m.tile]
+                : [m.tile, m.tile, m.tile, m.tile];
+            const set = document.createElement('span');
+            set.className = 'meld-set';
+            tiles.forEach((t, k) => {
+                const back = m.type === 'kong' && m.concealed && (k === 0 || k === 3);
+                set.appendChild(tileEl(t, 'span', { back }));
+            });
+            b.appendChild(set);
+            const tag = document.createElement('span');
+            tag.className = 'meld-tag';
+            tag.textContent = m.type === 'kong' ? (m.concealed ? 'concealed kong' : 'kong') : m.type;
+            b.appendChild(tag);
+            b.addEventListener('click', () => breakMeld(idx));
+            melds.appendChild(b);
         });
-        b.addEventListener('click', () => { state.melds.splice(idx, 1);state.msg = ''; render(); });
-        melds.appendChild(b);
-    });
 
-    const hand = $('#hand');
-    hand.innerHTML = '';
-    state.hand.forEach((t, idx) => {
-        const b = tileEl(t, 'button');
-        b.title = 'Remove ' + tileName(t);
-        b.addEventListener('click', () => {
-            state.hand.splice(idx, 1); 
-            if (state.mode === 'win' && state.win !== null) state.mode = 'hand';
-            state.msg = '';
-            render();
+        const hand = $('#hand');
+        hand.innerHTML = '';
+        state.hand.forEach((t, idx) => {
+            const b = tileEl(t, 'button');
+            const isSel = state.sel && state.sel.zone === 'hand' && state.sel.idx === idx;
+            if (isSel) b.classList.add('selected');
+            b.addEventListener('click', () => {
+                state.sel = isSel ? null : { zone: 'hand', idx: idx };
+                state.msg = '';
+                render();
+            });
+            hand.appendChild(b);
         });
-        hand.appendChild(b);
-    });
+        for (let k = state.hand.length; k < cap(); k++) {
+            const s = document.createElement('span');
+            s.className = 'slot';
+            hand.appendChild(s);
+        }
+        const goal = cap() + 1;
+        $('#hand-count').textContent = '(' + total() + '/' + goal + (total() > goal ? ', extra tiles are for your kongs' : '') + ')';
 
-    for (let k = state.hand.length; k < cap(); k++) {
-        const s = document.createElement('span');
-        s.className = 'slot';
-        hand.appendChild(s);
+        const win = $('#win');
+        win.innerHTML = '';
+        if (state.win !== null) {
+            const b = tileEl(state.win, 'button');
+            const isSel = state.sel && state.sel.zone === 'win';
+            if (isSel) b.classList.add('selected');
+            b.addEventListener('click', () => {
+                state.sel = isSel ? null : { zone: 'win' };
+                state.msg = '';
+                render();
+            });
+            win.appendChild(b);
+        }
+        else {
+            const s = document.createElement('span');
+            s.className = 'slot';
+            win.appendChild(s);
+        }
     }
-    $('#hand-count').textContent = '(' + state.hand.length + '/' + cap() + ', click to remove)';
 
-    const win = $('#win');
-    win.innerHTML = '';
-    if (state.win !== null) {
-      const b = tileEl(state.win, 'button');
-      b.title = 'Remove ' + tileName(state.win);
-      b.addEventListener('click', () => { state.win = null; state.mode = state.hand.length < cap() ? 'hand' : 'win'; render(); });
-      win.appendChild(b);
-    } else {
-      const s = document.createElement('span');
-      s.className = 'slot';
-      win.appendChild(s);
+    renderers.push(renderHand, renderActions);
+
+    $('#clear').addEventListener('click', clearAll);
+
+    function optHTML(title, inner) {
+        return '<div class="opt"><span>' + title + '</span>' + inner + '</div>';
     }
-}
-
-renderers.push(renderHand);
-$('#clear').addEventListener('click', clearAll);
-
-function optHTML(title, inner) {
-    return '<div class="opt"><span>' + title + '</span>' + inner + '</div>';
-  }
-  function windSelect(id, value) {
-    return '<select id="' + id + '">' + WIND_NAMES.map((n, k) => '<option value="' + k + '"' + (k === value ? ' selected' : '') + '>' + n + '</option>').join('') + '</select>';
-  }
-
-  function renderOpts() {
-    const s = state;
-    $('#opts').innerHTML =
-      optHTML('Win by',
-        '<label><input type="radio" name="how" value="self"' + (s.selfDrawn ? ' checked' : '') + '> Self-drawn</label>' +
-        '<label><input type="radio" name="how" value="discard"' + (!s.selfDrawn ? ' checked' : '') + '> Discard</label>') +
-      optHTML('Prevalent wind', windSelect('prevalent', s.prevalent)) +
-      optHTML('Seat wind', windSelect('seat', s.seat)) +
-      optHTML('Flower tiles', '<input id="flowers" type="number" min="0" max="8" value="' + s.flowers + '">') +
-      optHTML('Special circumstances',
-        '<label><input id="lastTile" type="checkbox"' + (s.lastTile ? ' checked' : '') + '> Last tile (4th copy of the winning tile)</label>' +
-        '<label><input id="lastOfWall" type="checkbox"' + (s.lastOfWall ? ' checked' : '') + '> Last tile of the wall (' + (s.selfDrawn ? 'draw' : 'discard') + ')</label>' +
-        '<label class="' + (s.selfDrawn ? '' : 'off') + '"><input id="replacement" type="checkbox"' + (s.replacement ? ' checked' : '') + (s.selfDrawn ? '' : ' disabled') + '> Out with replacement tile</label>' +
-        '<label class="' + (s.selfDrawn ? 'off' : '') + '"><input id="robbing" type="checkbox"' + (s.robbing ? ' checked' : '') + (s.selfDrawn ? ' disabled' : '') + '> Robbing the kong</label>');
-
-    document.querySelectorAll('input[name="how"]').forEach((el) => el.addEventListener('change', () => {
-      state.selfDrawn = el.value === 'self';
-      if (state.selfDrawn) state.robbing = false; else state.replacement = false;
-      render();
-    }));
-    $('#prevalent').addEventListener('change', (e) => { state.prevalent = +e.target.value; renderResult(); });
-    $('#seat').addEventListener('change', (e) => { state.seat = +e.target.value; renderResult(); });
-    $('#flowers').addEventListener('input', (e) => {
-      state.flowers = Math.max(0, Math.min(8, parseInt(e.target.value, 10) || 0));
-      renderResult();
-    });
-    for (const id of ['lastTile', 'lastOfWall', 'replacement', 'robbing']) {
-      $('#' + id).addEventListener('change', (e) => { state[id] = e.target.checked; renderResult(); });
+    function windSelect(id, value) {
+      return '<select id="' + id + '">' + WIND_NAMES.map((n, k) => '<option value="' + k + '"' + (k === value ? ' selected' : '') + '>' + n + '</option>').join('') + '</select>';
     }
-  }
 
-  renderers.push(renderOpts);
+    function renderOpts() {
+      const s = state;
+      $('#opts').innerHTML =
+        optHTML('Win by',
+          '<label><input type="radio" name="how" value="self"' + (s.selfDrawn ? ' checked' : '') + '> Self-drawn</label>' +
+          '<label><input type="radio" name="how" value="discard"' + (!s.selfDrawn ? ' checked' : '') + '> Discard</label>') +
+        optHTML('Prevalent wind', windSelect('prevalent', s.prevalent)) +
+        optHTML('Seat wind', windSelect('seat', s.seat)) +
+        optHTML('Flower tiles', '<input id="flowers" type="number" min="0" max="8" value="' + s.flowers + '">') +
+        optHTML('Special circumstances',
+          '<label><input id="lastTile" type="checkbox"' + (s.lastTile ? ' checked' : '') + '> Last tile (4th copy of the winning tile)</label>' +
+          '<label><input id="lastOfWall" type="checkbox"' + (s.lastOfWall ? ' checked' : '') + '> Last tile of the wall (' + (s.selfDrawn ? 'draw' : 'discard') + ')</label>' +
+          '<label class="' + (s.selfDrawn ? '' : 'off') + '"><input id="replacement" type="checkbox"' + (s.replacement ? ' checked' : '') + (s.selfDrawn ? '' : ' disabled') + '> Out with replacement tile</label>' +
+          '<label class="' + (s.selfDrawn ? 'off' : '') + '"><input id="robbing" type="checkbox"' + (s.robbing ? ' checked' : '') + (s.selfDrawn ? ' disabled' : '') + '> Robbing the kong</label>');
 
-      function esc(s) {
-    return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  }
-
-  function decompHTML(d) {
-    const labels = {
-      standard: 'Arrangement used',
-      knitted: 'Arrangement used (knitted straight)',
-      thirteenOrphans: 'Special hand',
-      sevenPairs: 'Special hand',
-      sevenShiftedPairs: 'Special hand',
-      greaterHonorsKnitted: 'Special hand',
-      lesserHonorsKnitted: 'Special hand',
-    };
-    const wrap = document.createElement('div');
-    wrap.className = 'decomp';
-    const label = document.createElement('div');
-    label.className = 'label';
-    label.textContent = labels[d.kind] || 'Arrangement used';
-    wrap.appendChild(label);
-    const row = document.createElement('div');
-    row.className = 'tile-row';
-    if (d.groups.length) {
-      d.groups.forEach((g) => {
-        const grp = document.createElement('span');
-        grp.className = 'grp';
-        g.tiles.forEach((t, k) => grp.appendChild(tileEl(t, 'span', { back: g.type === 'kong' && g.concealedKong && (k === 0 || k === 3) })));
-        row.appendChild(grp);
+      document.querySelectorAll('input[name="how"]').forEach((el) => el.addEventListener('change', () => {
+        state.selfDrawn = el.value === 'self';
+        if (state.selfDrawn) state.robbing = false; else state.replacement = false;
+        render();
+      }));
+      $('#prevalent').addEventListener('change', (e) => { state.prevalent = +e.target.value; renderResult(); });
+      $('#seat').addEventListener('change', (e) => { state.seat = +e.target.value; renderResult(); });
+      $('#flowers').addEventListener('input', (e) => {
+        state.flowers = Math.max(0, Math.min(8, parseInt(e.target.value, 10) || 0));
+        renderResult();
       });
-      if (d.pair) {
-        const grp = document.createElement('span');
-        grp.className = 'grp';
-        d.pair.forEach((t) => grp.appendChild(tileEl(t, 'span')));
-        row.appendChild(grp);
+      for (const id of ['lastTile', 'lastOfWall', 'replacement', 'robbing']) {
+        $('#' + id).addEventListener('change', (e) => { state[id] = e.target.checked; renderResult(); });
       }
-    } else {
-      (d.tiles || []).forEach((t) => row.appendChild(tileEl(t, 'span')));
     }
-    wrap.appendChild(row);
-    return wrap;
-  }
 
-  function renderResult() {
-    const box = $('#result');
-    box.innerHTML = '';
-    const ready = state.win !== null && state.hand.length === cap();
-    if (!ready) {
-      const need = cap() - state.hand.length + (state.win === null ? 1 : 0);
+    renderers.push(renderOpts);
+
+    function esc(s) {
+    return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    }
+
+    function decompHTML(d) {
+      const labels = {
+        standard: 'Arrangement used',
+        knitted: 'Arrangement used (knitted straight)',
+        thirteenOrphans: 'Special hand',
+        sevenPairs: 'Special hand',
+        sevenShiftedPairs: 'Special hand',
+        greaterHonorsKnitted: 'Special hand',
+        lesserHonorsKnitted: 'Special hand',
+      };
+      const wrap = document.createElement('div');
+      wrap.className = 'decomp';
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = labels[d.kind] || 'Arrangement used';
+      wrap.appendChild(label);
+      const row = document.createElement('div');
+      row.className = 'tile-row';
+      if (d.groups.length) {
+        d.groups.forEach((g) => {
+          const grp = document.createElement('span');
+          grp.className = 'grp';
+          g.tiles.forEach((t, k) => grp.appendChild(tileEl(t, 'span', { back: g.type === 'kong' && g.concealedKong && (k === 0 || k === 3) })));
+          row.appendChild(grp);
+        });
+        if (d.pair) {
+          const grp = document.createElement('span');
+          grp.className = 'grp';
+          d.pair.forEach((t) => grp.appendChild(tileEl(t, 'span')));
+          row.appendChild(grp);
+        }
+      } else {
+        (d.tiles || []).forEach((t) => row.appendChild(tileEl(t, 'span')));
+      }
+      wrap.appendChild(row);
+      return wrap;
+    }
+
+    function renderResult() {
+      const box = $('#result');
+      box.innerHTML = '';
+      const ready = state.win !== null && state.hand.length === cap();
+      if (!ready) {
       const p = document.createElement('p');
       p.className = 'empty';
-      p.textContent = 'Add ' + need + ' more tile' + (need === 1 ? '' : 's') + ' to complete the hand (' + (state.hand.length + (state.win !== null ? 1 : 0)) + '/' + (cap() + 1) + ').';
+      const t = total();
+      const goal = cap() + 1;
+      if (t > goal) {
+        p.textContent = 'You have ' + t + ' tiles but a hand needs ' + goal + '. Tap a tile you hold four of and declare it as a kong.';
+      }
+      else if (t === goal) {
+        p.textContent = 'Now tap the tile you won with and choose "This is the winning tile".';
+      }
+      else {
+        const need = goal - t;
+        p.textContent = 'Add ' + need + ' more tile' + (need === 1 ? '' : 's') + ' to complete the hand (' + t + '/' + goal + ').';
+      }
       box.appendChild(p);
       return;
-    }
-    const r = score({
-      melds: state.melds,
-      hand: state.hand,
-      win: state.win,
-      selfDrawn: state.selfDrawn,
-      prevalent: state.prevalent,
-      seat: state.seat,
-      flowers: state.flowers,
-      lastTile: state.lastTile,
-      lastOfWall: state.lastOfWall,
-      replacement: state.replacement,
-      robbing: state.robbing,
-    });
-    if (!r.valid) {
-      const p = document.createElement('p');
-      p.className = 'err';
-      p.textContent = r.error;
-      box.appendChild(p);
-      return;
-    }
-    const head = document.createElement('div');
-    head.innerHTML =
-      '<div class="total"><strong>' + r.total + '</strong><span>fan' + (r.flowers ? ' (including ' + r.flowers + ' flower' + (r.flowers === 1 ? '' : 's') + ')' : '') + '</span></div>' +
-      '<span class="chip ' + (r.meetsMinimum ? 'ok' : 'bad') + '">' +
-      (r.meetsMinimum ? 'Valid win (8+ fan)' : 'Only ' + r.base + ' fan without flowers: needs 8 to win') + '</span>';
-    box.appendChild(head);
+      }
+      const r = score({
+        melds: state.melds,
+        hand: state.hand,
+        win: state.win,
+        selfDrawn: state.selfDrawn,
+        prevalent: state.prevalent,
+        seat: state.seat,
+        flowers: state.flowers,
+        lastTile: state.lastTile,
+        lastOfWall: state.lastOfWall,
+        replacement: state.replacement,
+        robbing: state.robbing,
+      });
+      if (!r.valid) {
+        const p = document.createElement('p');
+        p.className = 'err';
+        p.textContent = r.error;
+        box.appendChild(p);
+        return;
+      }
+      const head = document.createElement('div');
+      head.innerHTML =
+        '<div class="total"><strong>' + r.total + '</strong><span>fan' + (r.flowers ? ' (including ' + r.flowers + ' flower' + (r.flowers === 1 ? '' : 's') + ')' : '') + '</span></div>' +
+        '<span class="chip ' + (r.meetsMinimum ? 'ok' : 'bad') + '">' +
+        (r.meetsMinimum ? 'Valid win (8+ fan)' : 'Only ' + r.base + ' fan without flowers: needs 8 to win') + '</span>';
+      box.appendChild(head);
 
-    const rows = r.fans.map((f) =>
-      '<tr><td>' + esc(f.name) + '<span class="zh">' + esc(f.zh) + '</span>' +
-      (f.count > 1 && f.id !== 'flowers' ? ' <span class="mult">× ' + f.count + '</span>' : '') +
-      (f.id === 'flowers' ? ' <span class="mult">× ' + f.count + '</span>' : '') +
-      '</td><td class="pts">' + f.points + '</td></tr>').join('');
-    const table = document.createElement('table');
-    table.className = 'fans';
-    table.innerHTML = '<tbody>' + rows + '</tbody><tfoot><tr><td>Total</td><td class="pts">' + r.total + '</td></tr></tfoot>';
-    box.appendChild(table);
-    box.appendChild(decompHTML(r.decomposition));
-  }
+      const rows = r.fans.map((f) =>
+        '<tr><td>' + esc(f.name) + '<span class="zh">' + esc(f.zh) + '</span>' +
+        (f.count > 1 && f.id !== 'flowers' ? ' <span class="mult">× ' + f.count + '</span>' : '') +
+        (f.id === 'flowers' ? ' <span class="mult">× ' + f.count + '</span>' : '') +
+        '</td><td class="pts">' + f.points + '</td></tr>').join('');
+      const table = document.createElement('table');
+      table.className = 'fans';
+      table.innerHTML = '<tbody>' + rows + '</tbody><tfoot><tr><td>Total</td><td class="pts">' + r.total + '</td></tr></tfoot>';
+      box.appendChild(table);
+      box.appendChild(decompHTML(r.decomposition));
+    }
 
-  renderers.push(renderResult);
+    renderers.push(renderResult);
 
     function renderExamples() {
     const sel = $('#example');
@@ -422,15 +556,15 @@ function optHTML(title, inner) {
       if (sel.value !== '') loadExample(EXAMPLES[+sel.value]);
       sel.value = '';
     };
-  }
-
-  renderExamples();
-
-function render(){
-    renderers.forEach((draw) => draw());
     }
 
-render();
+    renderExamples();
+
+    function render(){
+        renderers.forEach((draw) => draw());
+    }
+
+  render();
 
 })();
 
