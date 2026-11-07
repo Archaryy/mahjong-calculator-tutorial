@@ -286,37 +286,6 @@ table.fans { width: 100%; border-collapse: collapse; font-size: .9rem; }
   .tile .t-bot { font-size: 1rem; }
 }
 
-.tile {
-    background :url("../assets/tiles/Front.svg") center / 100% 100% no-repeat;
-    border: 0;
-}
-
-.tile .face {
-    position: absolute;
-    inset: 12% 10% 18% 10%;
-    width: 80%;
-    height: 70%;
-    object-fit: contain;
-    pointer-events: none;
-}
-
-.tile.back {
-    background: url("../assets/tiles/Back.svg") center / 100% 100% no-repeat;
-    filter: saturate(.55) brightness(.85);
-}
-
-.tile.back .face{ display: none; }
-
-.haku-frame {
-    position: absolute;
-    inset: 16% 18% 22% 18%;
-    border: 3px solid var(--c-p);
-    border-radius: 3px;
-    pointer-events: none;
-}
-
-.tile.back .haku-frame{ display: none; }
-
 /* real tile pictures (fixed one) */
 
 .tile {
@@ -367,4 +336,19 @@ table.fans { width: 100%; border-collapse: collapse; font-size: .9rem; }
     margin-top: 6px; 
     padding-top: 8px; 
     border-top: 1px dashed var(--line); 
+}
+
+/* ---------- phone and installed-app polish */
+button, .tile, select { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.top { padding-top: calc(24px + env(safe-area-inset-top)); }
+.foot { padding-bottom: calc(28px + env(safe-area-inset-bottom)); }
+
+/* on phones, size the tiles so a row of 9 always fits the screen width */
+@media (max-width: 520px) {
+  :root {
+    --tile-w: calc((100vw - 66px - 24px) / 9);
+    --tile-h: calc(var(--tile-w) * 1.32);
+  }
+  .palette .row { gap: 3px; }
+  .meld .tile { --tile-w: 30px; --tile-h: 40px; }
 }

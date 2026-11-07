@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0e3b34">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="MCR Calc">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>MCR Mahjong Calculator</title>
   <meta name="description" content="Build a winning hand and get the fan breakdown under Mahjong Competition Rules (MCR).">
   <link rel="stylesheet" href="css/styles.css">
@@ -72,5 +79,12 @@
 
   <script src="js/engine.js"></script>
   <script src="js/app.js"></script>
+
+  <script>
+    // make the app installable and usable offline (only works on http/https, not on a file you double-click)
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
 </body>
 </html>

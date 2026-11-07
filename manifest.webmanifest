@@ -1,0 +1,14 @@
+{
+    "name" : "MCR Mahjong Calculator",
+    "short_name" : "MCR Calc",
+    "description" : "Build a Mahjong hand and get the MCR fan breakdown.",
+    "start_url" : "./",
+    "display" : "standalone",
+    "background_color" : "#0e3b34",
+    "theme_color" : "#0e3b34",
+    "icons" : [
+        { "src" : "icons/icon-192.png", "sizes" : "192x192", "type" : "image/png" },
+        { "src" : "icons/icon-512.png", "sizes" : "512x512", "type" : "image/png" },
+        { "src" : "icons/icon-512.png", "sizes" : "512x512", "type" : "image/png", "purpose" : "maskable" }
+    ]
+}
