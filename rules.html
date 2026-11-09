@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCR Fan List</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="0e3b34">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header class="top">
+        <div class="wrap">
+            <h1>Fan list <span class="zh">番种表</span></h1>
+            <p>Every scoring combination, with an example hand you can open in the calculator.</p>
+            <nav class="nav">
+                <a href="index.html">Calculator</a>
+                <a href="rules.html" aria-current="page">Fan list</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="wrap rules">
+        <div class="rules-bar">
+            <input id="q" type="search" placeholder="Search by name, Chinese name or description" aria-label="Search fans">
+            <div id="chips" class="chips" role="group" aria-label="Filter"></div>
+            <p id="count" class="small" aria-live="polite"></p>
+        </div>
+        <div id="list"></div>
+    </main>
+
+    <script src="js/engine.js"></script>
+    <script src="js/fans-data.js"></script>
+    <script src="js/rules.js"></script>
+    
+</body>
+</html>

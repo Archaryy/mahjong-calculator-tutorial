@@ -626,7 +626,7 @@
     box.appendChild(head);
 
     const rows = r.fans.map((f) =>
-      '<tr><td>' + esc(f.name) + '<span class="zh">' + esc(f.zh) + '</span>' +
+      '<tr><td><a class="fanlink" href="rules.html#fan-' + f.id + '">' + esc(f.name) + '</a><span class="zh">' + esc(f.zh) + '</span>' +
       (f.count > 1 && f.id !== 'flowers' ? ' <span class="mult">× ' + f.count + '</span>' : '') +
       (f.id === 'flowers' ? ' <span class="mult">× ' + f.count + '</span>' : '') +
       '</td><td class="pts">' + f.points + '</td></tr>').join('');

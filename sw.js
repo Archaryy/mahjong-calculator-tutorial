@@ -1,11 +1,14 @@
 const { cache } = require("react");
 
 // Service worker: keeps a copy of the app on the phone so it opens offline.
-const CACHE = 'mcr-calc-v2';
+const CACHE = 'mcr-calc-v3';
 
 const FILES = [
     './',
     'index.html',
+    'rules.html',
+    'js/fans-data.js',
+    'js/rules.js',
     'css/styles.css',
     'js/engine.js',
     'js/app.js',
