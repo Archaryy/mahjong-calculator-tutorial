@@ -524,6 +524,66 @@
       return wrap;
     }
 
+    function scoreInput(win) { // everything score() needs, for a given winning tile.
+      return {
+        melds : state.melds,
+        hand : state.hand,
+        win : win,
+        selfDrawn : state.selfDrawn,
+        prevalent : state.prevalent,
+        seat : state.seat,
+        flowers : state.flowers.length,
+        lastTile : state.lastTile,
+        lastOfWall : state.lastOfWall,
+        replacement : state.replacement,
+        robbing : state.robbing,
+      };
+    }
+
+    function findWaits() { // every tile that would win with 8 fan or more.
+      const used = usage();
+      const waits = [];
+      for (let t = 0; t < 34; t++) {
+        if (used[t] >= 4) continue; // all four copies already in hand
+        const r = score(scoreInput(t));
+        if (r.valid && r.meetsMinimum) waits.push({
+          tile: t, total: r.total
+        });
+      }
+      return waits;
+    }
+
+    function renderWaits(box) {
+      const waits = findWaits();
+      const wrap = document.createElement('div');
+      wrap.className = 'waits';
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = waits.length ? 'Winning tiles (8+ fan)' : 'No winning tile gives 8 fan yet.';
+      wrap.appendChild(label);
+      const row = document.createElement('div');
+      row.className = 'tile-row';
+      waits.forEach((w) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'wait';
+        b.title = 'Use ' + tileName(w.tile) + ' as the winning tile';
+        b.appendChild(tileEl(w.tile, 'span'));
+        const n = document.createElement('span');
+        n.className = 'fan';
+        n.textContent = w.total + ' fan';
+        b.appendChild(n);
+        b.addEventListener('click', () => {
+          state.win = w.tile;
+          state.sel = null;
+          render();
+        });
+        row.appendChild(b);
+      });
+      wrap.appendChild(row);
+      box.appendChild(wrap);
+    }
+
     function renderResult() {
       const box = $('#result');
       box.innerHTML = '';
@@ -539,26 +599,18 @@
       else if (t === goal) {
         p.textContent = 'Now tap the tile you won with and choose "This is the winning tile".';
       }
+      else if (state.win === null && state.hand.length === cap()) {
+        p.textContent = 'Your hand is ready and waiting. Tap a winning tile below, or add the tile you won with.';
+      }
       else {
         const need = goal - t;
         p.textContent = 'Add ' + need + ' more tile' + (need === 1 ? '' : 's') + ' to complete the hand (' + t + '/' + goal + ').';
       }
       box.appendChild(p);
+      if (state.win === null && state.hand.length === cap()) renderWaits(box);
       return;
       }
-      const r = score({
-        melds: state.melds,
-        hand: state.hand,
-        win: state.win,
-        selfDrawn: state.selfDrawn,
-        prevalent: state.prevalent,
-        seat: state.seat,
-        flowers: state.flowers.length,
-        lastTile: state.lastTile,
-        lastOfWall: state.lastOfWall,
-        replacement: state.replacement,
-        robbing: state.robbing,
-      });
+      const r = score(scoreInput(state.win));
       if (!r.valid) {
         const p = document.createElement('p');
         p.className = 'err';
@@ -587,6 +639,145 @@
 
     renderers.push(renderResult);
 
+    const SUIT_LETTERS = ['m', 'p', 's', 'z']; // [0,1,2,12] -> 123m4p
+    function tilesToShort(tiles) {
+      let out = '';
+      let digits = '';
+      let suit = -1;
+      tiles.slice().sort((a, b) => a - b).forEach((t) => {
+        const sIdx = Math.floor(t / 9);  // 0 m, 1 p, 2 s , 3 honours
+        if (sIdx !== suit && digits) {
+          out += digits + SUIT_LETTERS[suit]; digits = '';
+        }
+        suit = sIdx;
+        digits += (t % 9) + 1;
+      });
+      if (digits) out += digits + SUIT_LETTERS[suit];
+      return out;
+    }
+
+    function shareHash() {
+      const parts = [];
+      if (state.hand.length) parts.push('h=' + tilesToShort(state.hand));
+      if (state.win !== null) parts.push('w=' + tilesToShort([state.win]));
+      if(state.melds.length) {
+        parts.push('m=' + state.melds.map((m) => (m.type === 'chow' ? 'c' : m.type === 'pung' ? 'p' : (m.concealed ? 'K' : 'k')) + tilesToShort([m.tile])).join(','));
+      }
+      
+      if (state.flowers.length) parts.push('f=' + state.flowers.map((k) => k + 1).join(''));
+      let o = '';
+      if (state.selfDrawn) o += 's';
+      if (state.lastTile) o += 'l';
+      if (state.lastOfWall) o += 'w';
+      if (state.replacement) o += 'r';
+      if (state.robbing) o += 'b';
+      if (o) parts.push('o=' + o);
+      parts.push('pw=' + state.prevalent, 'sw=' + state.seat);
+      return parts.join('&');
+    }
+
+    function shareURL() {
+      return location.href.split('#')[0] + '#' + shareHash();
+    }
+
+    function applyHash() {
+      const raw = location.hash.replace(/^#/, '');
+      if(!raw) return false;
+      const q = new URLSearchParams(raw);
+      const next = { melds: [], hand: [], win: null, flowers: [] };
+      const used = new Array(34).fill(0);
+      const ok = (t) => Number.isInteger(t) && t >=0 && t < 34;
+
+      next.hand = parseTiles(q.get('h') || '').sort((a, b) => a - b);
+      const w = parseTiles(q.get('w') || '');
+      if (w.length > 1) return false;
+      if (w.length) next.win = w[0];
+
+      const mtext = q.get('m');
+      if (mtext) {
+        for (const piece of mtext.split(',')) {
+          const kind = piece[0];
+          const t = parseTiles(piece.slice(1))[0];
+          if (!'cpkK'.includes(kind) || !ok(t)) return false;
+          if (kind === 'c' && !(t < 27 && t % 9 <= 6)) return false;
+          next.melds.push({ type: kind === 'c' ? 'chow' : kind === 'p' ? 'pung' : 'kong', tile: t, concealed: kind === 'K' });
+        }
+      }
+      if (next.melds.length > 4) return false;
+
+      const ftext = q.get('f') || '';
+      for (const ch of ftext) {
+        const k = +ch - 1;
+        if (k >= 0 && k < 8 && !next.flowers.includes(k)) next.flowers.push(k);
+      }
+      next.flowers.sort((a, b) => a - b);
+
+      // never trust the address: check every tile and that no tile is used more than 4 times
+      next.hand.concat(next.win === null ? [] : [next.win]).forEach((t) => used[t]++);
+      next.melds.forEach((m) => {
+        if (m.type === 'chow') { used[m.tile]++; used[m.tile + 1]++; used[m.tile + 2]++; }
+        else used[m.tile] += m.type === 'kong' ? 4 : 3;
+      });
+      if (!next.hand.every(ok) || used.some((n) => n > 4)) return false;
+      if (next.hand.length + (next.win === null ? 0 : 1) > 18) return false;
+
+      state.melds = next.melds;
+      state.hand = next.hand;
+      state.win = next.win;
+      state.flowers = next.flowers;
+      const o = q.get('o') || '';
+      state.selfDrawn = o.includes('s');
+      state.lastTile = o.includes('l');
+      state.lastOfWall = o.includes('w');
+      state.replacement = o.includes('r');
+      state.robbing = o.includes('b');
+      const pw = +q.get('pw'), sw = +q.get('sw');
+      state.prevalent = pw >= 0 && pw < 4 ? pw : 0;
+      state.seat = sw >= 0 && sw < 4 ? sw : 0;
+      state.sel = null;
+      state.msg = '';
+      return true;
+    }
+
+    window.addEventListener('hashchange', () => { if (applyHash()) render(); });
+
+     function currentResult() { // the score of the finished hand, or null
+    if (state.win === null || state.hand.length !== cap()) return null;
+    const r = score(scoreInput(state.win));
+    return r.valid ? r : null;
+  }
+
+  function shareMsg(text) { $('#share-msg').textContent = text; }
+
+  async function shareLink() {
+    const url = shareURL();
+    const r = currentResult();
+    const text = r ? 'My mahjong hand: ' + r.total + ' fan' : 'My mahjong hand';
+    if (navigator.share) {
+      try { await navigator.share({ title: 'MCR Mahjong Calculator', text: text, url: url }); return; }
+      catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    copyLink();
+  }
+
+  async function copyLink() {
+    const url = shareURL();
+    try {
+      await navigator.clipboard.writeText(url);
+      shareMsg('Link copied. Paste it to a friend.');
+    } catch (e) {
+      window.prompt('Copy this link:', url);
+    }
+  }
+
+  function renderShare() {
+    $('#share-card').hidden = !(state.hand.length || state.melds.length || state.win !== null);
+  }
+
+  renderers.push(renderShare);
+  $('#share-link').addEventListener('click', shareLink);
+  $('#share-copy').addEventListener('click', copyLink);
+
     function renderExamples() {
     const sel = $('#example');
     sel.innerHTML = '<option value="">Choose…</option>' + EXAMPLES.map((e, k) => '<option value="' + k + '">' + esc(e.name) + '</option>').join('');
@@ -604,6 +795,8 @@
     document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { state.sel = null; render(); }
     });
+
+  applyHash();
   render();
 
 })();
