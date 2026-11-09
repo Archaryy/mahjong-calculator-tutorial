@@ -367,3 +367,14 @@ button.wait .fan { font-size: .72rem; color: var(--muted); font-weight: 600; }
 /* ---- share ---- */
 .share-row { display: flex; flex-wrap: wrap; gap: 8px; }
 #share-msg { margin: 8px 0 0; min-height: 1.2em; color: var(--muted); }
+
+
+/* ---- image and print ---- */
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+#print-sheet { display: none; }
+@media print {
+  body > *:not(#print-sheet) { display: none !important; }
+  #print-sheet { display: block !important; }
+  #print-sheet img { width: 100%; height: auto; }
+  @page { margin: 12mm; }
+}
