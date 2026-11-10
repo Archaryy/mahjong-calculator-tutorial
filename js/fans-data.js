@@ -1,10 +1,101 @@
+// Plain-English help for every fan, plus an example hand that really scores it.
+// Names, points and exclusions come from the engine (MCR.CATALOG), so only the extras live here.
+// h = concealed hand, w = winning tile, m = declared sets [type, first tile], o = how it was won,
+// t = tags used by the filter chips: C closed, H honors, W win situation, K kongs, S sequences, P pungs
 window.FANS_DATA = {
-    bigFourWinds : {
-        d: 'Pungs of kongs of all four winds, plus any pair.', h: '5m', w: '5m', m: [['pung', '1z'], ['pung', '2z'], ['pung', '3z'], ['pung', '4z']], t: 'HP'},
-    nineGates: { 
-        d: 'One suit: 1112345678999 plus any one extra tile of that suit. Fully concealed.', h: '1112345678999m', w: '4m', o: { selfDrawn: true }, t: 'C' },
-    pureStraight: { 
-        d: 'Chows 123, 456 and 789 in one suit.', h: '123456789m77p88s', w: '8s', t: 'S' },
-    selfDrawn: { 
-        d: 'You won by drawing the winning tile yourself.', h: '456p789s234m5p', w: '5p', m: [['chow', '2m']], o: { selfDrawn: true }, t: 'W' },
+  // ---- 88
+  bigFourWinds: { d: 'Pungs or kongs of all four winds, plus any pair.', h: '5m', w: '5m', m: [['pung', '1z'], ['pung', '2z'], ['pung', '3z'], ['pung', '4z']], t: 'HP' },
+  bigThreeDragons: { d: 'Pungs or kongs of all three dragons.', h: '23m55p', w: '4m', m: [['pung', '5z'], ['pung', '6z'], ['pung', '7z']], t: 'HP' },
+  allGreen: { d: 'Only green tiles: bamboo 2, 3, 4, 6, 8 and the green dragon.', h: '2342346668883s', w: '3s', t: '' },
+  nineGates: { d: 'One suit: 1112345678999 plus any one extra tile of that suit. Fully concealed.', h: '1112345678999m', w: '4m', o: { selfDrawn: true }, t: 'C' },
+  fourKongs: { d: 'Four kongs, open or concealed.', h: '7z', w: '7z', m: [['kong', '1m'], ['kong', '5p'], ['kong', '6s'], ['kong', '2z']], t: 'K' },
+  sevenShiftedPairs: { d: 'Seven pairs in one suit, each pair one number higher than the last (11 22 33 44 55 66 77).', h: '1122334455667m', w: '7m', o: { selfDrawn: true }, t: 'C' },
+  thirteenOrphans: { d: 'One of each terminal and honor (1 and 9 of every suit, four winds, three dragons) plus one extra copy of any of them.', h: '19m19p19s1234567z', w: '5z', t: 'CH' },
+  // ---- 64
+  allTerminals: { d: 'Only 1s and 9s of the three suits. No honors.', h: '1s', w: '1s', m: [['pung', '1m'], ['pung', '9m'], ['pung', '1p'], ['pung', '9p']], t: 'P' },
+  littleFourWinds: { d: 'Pungs of three winds and a pair of the fourth wind.', h: '123m4z', w: '4z', m: [['pung', '1z'], ['pung', '2z'], ['pung', '3z']], t: 'HP' },
+  littleThreeDragons: { d: 'Pungs of two dragons and a pair of the third dragon.', h: '123m456p7z', w: '7z', m: [['pung', '5z'], ['pung', '6z']], t: 'HP' },
+  allHonors: { d: 'Only winds and dragons.', h: '4446z', w: '6z', m: [['pung', '1z'], ['pung', '2z'], ['pung', '3z']], t: 'HP' },
+  fourConcealedPungs: { d: 'Four pungs that you made yourself, not by claiming a discard.', h: '111m222p333s444z5m', w: '5m', o: { selfDrawn: true }, t: 'CP' },
+  pureTerminalChows: { d: 'One suit: chows 123 and 789 twice each, plus a pair of 5s.', h: '1237891237895m', w: '5m', t: 'S' },
+  // ---- 48
+  quadrupleChow: { d: 'Four identical chows in one suit.', h: '2342342342345m', w: '5m', t: 'S' },
+  fourPureShiftedPungs: { d: 'Four pungs in one suit, each one number higher (111 222 333 444).', h: '1112223334445m', w: '5m', t: 'P' },
+  // ---- 32
+  fourPureShiftedChows: { d: 'Four chows in one suit, each moving up by the same step of 1 or 2 (123 234 345 456).', h: '1232343454569m', w: '9m', t: 'S' },
+  threeKongs: { d: 'Three kongs, open or concealed.', h: '45m77z', w: '6m', m: [['kong', '1m'], ['kong', '3p'], ['kong', '6s']], t: 'K' },
+  allTerminalsAndHonors: { d: 'Only terminals (1, 9) and honors (winds, dragons).', h: '999s2z', w: '2z', m: [['pung', '1m'], ['pung', '9p'], ['pung', '1z']], t: 'HP' },
+  // ---- 24
+  sevenPairs: { d: 'Seven different pairs. A closed hand.', h: '11223355m99p77s4z', w: '4z', t: 'C' },
+  greaterHonorsKnitted: { d: 'One of each of the seven honors, plus seven tiles from a knitted straight (147, 258, 369 across the suits). Closed.', h: '1234567z147m258p', w: '3s', t: 'CH' },
+  allEvenPungs: { d: 'Four pungs and a pair, all made only of 2, 4, 6 and 8.', h: '222m444p666s888m2p', w: '2p', t: 'P' },
+  fullFlush: { d: 'Every tile from one suit. No honors.', h: '1234567891112m', w: '2m', t: '' },
+  pureTripleChow: { d: 'Three identical chows in one suit.', h: '567p1z', w: '1z', m: [['chow', '2m'], ['chow', '2m'], ['chow', '2m']], t: 'S' },
+  pureShiftedPungs: { d: 'Three pungs in one suit, each one number higher (111 222 333).', h: '111222333m456p7s', w: '7s', t: 'P' },
+  upperTiles: { d: 'Every tile is a 7, 8 or 9 of a suit.', h: '789m789p789s789m9p', w: '9p', t: '' },
+  middleTiles: { d: 'Every tile is a 4, 5 or 6 of a suit.', h: '456m456p456s456m5p', w: '5p', t: '' },
+  lowerTiles: { d: 'Every tile is a 1, 2 or 3 of a suit.', h: '123m123p123s123m1p', w: '1p', t: '' },
+  // ---- 16
+  pureStraight: { d: 'Chows 123, 456 and 789 in one suit.', h: '123456789m77p88s', w: '8s', t: 'S' },
+  threeSuitedTerminalChows: { d: 'Chows 123 and 789 in two suits, plus a pair of 5s in the third suit.', h: '123789m123789p5s', w: '5s', t: 'S' },
+  pureShiftedChows: { d: 'Three chows in one suit, each moving up by the same step of 1 or 2 (123 234 345, or 123 345 567).', h: '123345567m456p7z', w: '7z', t: 'S' },
+  allFives: { d: 'Every set and the pair contain a 5.', h: '345m456p567s456m5s', w: '5s', t: '' },
+  triplePung: { d: 'Pungs of the same number in all three suits.', h: '555m555p555s234m7z', w: '7z', t: 'P' },
+  threeConcealedPungs: { d: 'Three pungs that you made yourself, not by claiming a discard.', h: '111m222p333s456s7z', w: '7z', o: { selfDrawn: true }, t: 'CP' },
+  // ---- 12
+  lesserHonorsKnitted: { d: '14 different tiles: a knitted straight pattern plus honors, with no pairs or sets. Closed.', h: '147m258p369s1234z', w: '5z', t: 'CH' },
+  knittedStraight: { d: 'Knitted straight: 147 in one suit, 258 in another, 369 in the third, plus one more set and a pair.', h: '147m258p369s234m5z', w: '5z', t: 'S' },
+  upperFour: { d: 'Every tile is a 6, 7, 8 or 9.', h: '678m789p789s666m9m', w: '9m', t: '' },
+  lowerFour: { d: 'Every tile is a 1, 2, 3 or 4.', h: '123m234p234s111m4m', w: '4m', t: '' },
+  bigThreeWinds: { d: 'Pungs or kongs of three different winds.', h: '12m55p', w: '3m', m: [['pung', '1z'], ['pung', '2z'], ['pung', '3z']], t: 'HP' },
+  // ---- 8
+  mixedStraight: { d: 'Chows 123, 456 and 789, each in a different suit.', h: '123m456p789s234p5m', w: '5m', t: 'S' },
+  reversibleTiles: { d: 'Tiles that look the same upside down: dots 1 2 3 4 5 8 9, bamboo 2 4 5 6 8 9 and the white dragon.', h: '123p234p456s456s5p', w: '5p', t: '' },
+  mixedTripleChow: { d: 'The same chow (such as 234) in all three suits.', h: '234m234p234s567m5p', w: '5p', t: 'S' },
+  mixedShiftedPungs: { d: 'Three pungs in three different suits, each one number higher (222 333 444).', h: '222m333p444s567m9p', w: '9p', t: 'P' },
+  chickenHand: { d: 'A valid hand that earns no other fan. It is still worth 8, so it can win.', h: '45m77z', w: '6m', m: [['chow', '2m'], ['chow', '3p'], ['chow', '6s']], t: '' },
+  lastTileDraw: { d: 'Win by drawing the very last tile of the wall yourself.', h: '123456789m77p88s', w: '8s', o: { selfDrawn: true, lastOfWall: true }, t: 'W' },
+  lastTileClaim: { d: 'Win on the discard that is the very last tile of the game.', h: '123456789m77p88s', w: '8s', o: { lastOfWall: true }, t: 'W' },
+  outWithReplacement: { d: 'Win on the replacement tile you draw after declaring a kong.', h: '123456789m5p', w: '5p', m: [['kong', '1z']], o: { selfDrawn: true, replacement: true }, t: 'WK' },
+  robbingKong: { d: 'Win by taking the tile another player adds to their pung to make a kong.', h: '123456789m77p88s', w: '8s', o: { robbing: true }, t: 'W' },
+  // ---- 6
+  allPungs: { d: 'Four pungs or kongs and a pair. No chows.', h: '444m5s', w: '5s', m: [['pung', '1m'], ['pung', '2p'], ['pung', '3s']], t: 'P' },
+  halfFlush: { d: 'Tiles from one suit plus honors.', h: '123456789m1112z', w: '2z', t: 'H' },
+  mixedShiftedChows: { d: 'Three chows in three different suits, each one number higher (123 234 345).', h: '123m234p345s789m5p', w: '5p', t: 'S' },
+  allTypes: { d: 'Tiles from all five types: characters, dots, bamboo, winds and dragons.', h: '123m456p789s111z5z', w: '5z', t: 'H' },
+  meldedHand: { d: 'Four claimed sets, and you win on a discard with the last tile for the pair.', h: '5m', w: '5m', m: [['chow', '1m'], ['chow', '2p'], ['chow', '3s'], ['pung', '4m']], t: 'W' },
+  twoConcealedKongs: { d: 'Two kongs that you made without claiming a discard.', h: '123s456s7z', w: '7z', m: [['kong', '1m', true], ['kong', '5p', true]], t: 'KC' },
+  twoDragonPungs: { d: 'Pungs or kongs of two different dragons.', h: '123m456m7p', w: '7p', m: [['pung', '5z'], ['pung', '6z']], t: 'HP' },
+  // ---- 5
+  concealedAndMeldedKong: { d: 'One concealed kong and one open kong.', h: '123s456s7z', w: '7z', m: [['kong', '1m', true], ['kong', '5p']], t: 'K' },
+  // ---- 4
+  outsideHand: { d: 'Every set and the pair contains a terminal (1 or 9) or an honor.', h: '123m789p123s999m1p', w: '1p', t: '' },
+  fullyConcealed: { d: 'No claimed sets, and you win by drawing the last tile yourself.', h: '123456789m77p88s', w: '8s', o: { selfDrawn: true }, t: 'CW' },
+  twoMeldedKongs: { d: 'Two open kongs.', h: '123s456s7z', w: '7z', m: [['kong', '1m'], ['kong', '5p']], t: 'K' },
+  lastTile: { d: 'You win on the last copy of a tile, the other three already showing.', h: '123456789m77p88s', w: '8s', o: { lastTile: true }, t: 'W' },
+  // ---- 2
+  dragonPung: { d: 'A pung or kong of any dragon.', h: '123456789m5p', w: '5p', m: [['pung', '5z']], t: 'HP' },
+  prevalentWind: { d: 'A pung or kong of the prevalent (round) wind.', h: '123456789m5p', w: '5p', m: [['pung', '1z']], o: { prevalent: 0, seat: 1 }, t: 'HP' },
+  seatWind: { d: 'A pung or kong of your own seat wind.', h: '123456789m5p', w: '5p', m: [['pung', '2z']], o: { prevalent: 0, seat: 1 }, t: 'HP' },
+  concealedHand: { d: 'No claimed sets, but you win on a discard.', h: '123m456p789s234m5p', w: '5p', t: 'CW' },
+  allChows: { d: 'Four chows and a pair that is not an honor.', h: '123m456m789p234s5p', w: '5p', t: 'S' },
+  tileHog: { d: 'Four of the same tile in your hand that are not declared as a kong.', h: '111123m456p789s5p', w: '5p', t: '' },
+  doublePung: { d: 'Two pungs of the same number in two different suits.', h: '222m222p345s678m5p', w: '5p', t: 'P' },
+  twoConcealedPungs: { d: 'Two pungs that you made without claiming a discard.', h: '111m222p345s678m5p', w: '5p', o: { selfDrawn: true }, t: 'CP' },
+  concealedKong: { d: 'One kong that you made without claiming a discard.', h: '234567m234p5s', w: '5s', m: [['kong', '1m', true]], t: 'K' },
+  allSimples: { d: 'No terminals and no honors: only 2 to 8 of the suits.', h: '234m567p234s345m6p', w: '6p', t: '' },
+  // ---- 1
+  pureDoubleChow: { d: 'Two identical chows in one suit.', h: '234234m567p789s5s', w: '5s', t: 'S' },
+  mixedDoubleChow: { d: 'The same chow in two different suits.', h: '234m234p567s789m5s', w: '5s', t: 'S' },
+  shortStraight: { d: 'Two chows in one suit that run six in a row (123 456, or 234 567).', h: '123456m234p789s5s', w: '5s', t: 'S' },
+  twoTerminalChows: { d: 'Chows 123 and 789 in the same suit.', h: '123789m456p234s5s', w: '5s', t: 'S' },
+  pungTerminalsHonors: { d: 'A pung or kong of a terminal (1 or 9) or of a wind or dragon that does not score otherwise.', h: '123456m234p5s', w: '5s', m: [['pung', '9m']], t: 'P' },
+  meldedKong: { d: 'One open kong.', h: '234567m234p5s', w: '5s', m: [['kong', '1m']], t: 'K' },
+  oneVoidedSuit: { d: 'One of the three suits is completely missing from the hand.', h: '123456m234p789m5p', w: '5p', t: '' },
+  noHonors: { d: 'No winds and no dragons.', h: '123m456p789s222m5p', w: '5p', t: '' },
+  edgeWait: { d: 'You were waiting for a 3 to complete 12, or a 7 to complete 89.', h: '12m456p789s234m55p', w: '3m', t: 'W' },
+  closedWait: { d: 'You were waiting for the middle tile of a chow, such as the 2 in 1 _ 3.', h: '13m456p789s234m55p', w: '2m', t: 'W' },
+  singleWait: { d: 'You were waiting only for the tile that completes the pair.', h: '123m456p789s234m5p', w: '5p', t: 'W' },
+  selfDrawn: { d: 'You won by drawing the winning tile yourself.', h: '456p789s234m5p', w: '5p', m: [['chow', '2m']], o: { selfDrawn: true }, t: 'W' },
+  flowers: { d: 'One fan for each flower or season tile. Flowers never count toward the 8 fan you need to win.', h: '123456789m77p88s', w: '8s', flowers: [0, 4], t: 'W' },
 };
