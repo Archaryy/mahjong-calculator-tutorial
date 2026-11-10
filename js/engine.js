@@ -172,6 +172,8 @@
  
   def('robbingKong', 8, 'Robbing the Kong', '抢杠和', ['lastTile']);
 
+  def('twoConcealedKongs', 8, 'Two Concealed Kongs', '双暗杠', ['concealedKong', 'twoConcealedPungs']);
+
   // 6 points / faan
   def('allPungs', 6, 'All Pungs', '碰碰和', []);
   
@@ -182,13 +184,10 @@
   def('allTypes', 6, 'All Types', '五门齐', []);
  
   def('meldedHand', 6, 'Melded Hand', '全求人', ['singleWait']);
- 
-  def('twoConcealedKongs', 6, 'Two Concealed Kongs', '双暗杠', ['concealedKong', 'twoConcealedPungs']);
   
   def('twoDragonPungs', 6, 'Two Dragon Pungs', '双箭刻', ['dragonPung']);
 
-   // 5 points / faan *special maybe not too sure on this one.
-  def('concealedAndMeldedKong', 5, 'Concealed and Melded Kong', '明暗杠', ['concealedKong', 'meldedKong']);
+  def('concealedAndMeldedKong', 6, 'Concealed and Melded Kong', '明暗杠', ['concealedKong', 'meldedKong']);
 
   // 4 points / faan
   def('outsideHand', 4, 'Outside Hand', '全带幺', []);

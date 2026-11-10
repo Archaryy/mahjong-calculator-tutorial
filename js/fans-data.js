@@ -58,15 +58,14 @@ window.FANS_DATA = {
   lastTileClaim: { d: 'Win on the discard that is the very last tile of the game.', h: '123456789m77p88s', w: '8s', o: { lastOfWall: true }, t: 'W' },
   outWithReplacement: { d: 'Win on the replacement tile you draw after declaring a kong.', h: '123456789m5p', w: '5p', m: [['kong', '1z']], o: { selfDrawn: true, replacement: true }, t: 'WK' },
   robbingKong: { d: 'Win by taking the tile another player adds to their pung to make a kong.', h: '123456789m77p88s', w: '8s', o: { robbing: true }, t: 'W' },
+  twoConcealedKongs: { d: 'Two kongs that you made without claiming a discard.', h: '123s456s7z', w: '7z', m: [['kong', '1m', true], ['kong', '5p', true]], t: 'KC' },
   // ---- 6
   allPungs: { d: 'Four pungs or kongs and a pair. No chows.', h: '444m5s', w: '5s', m: [['pung', '1m'], ['pung', '2p'], ['pung', '3s']], t: 'P' },
   halfFlush: { d: 'Tiles from one suit plus honors.', h: '123456789m1112z', w: '2z', t: 'H' },
   mixedShiftedChows: { d: 'Three chows in three different suits, each one number higher (123 234 345).', h: '123m234p345s789m5p', w: '5p', t: 'S' },
   allTypes: { d: 'Tiles from all five types: characters, dots, bamboo, winds and dragons.', h: '123m456p789s111z5z', w: '5z', t: 'H' },
   meldedHand: { d: 'Four claimed sets, and you win on a discard with the last tile for the pair.', h: '5m', w: '5m', m: [['chow', '1m'], ['chow', '2p'], ['chow', '3s'], ['pung', '4m']], t: 'W' },
-  twoConcealedKongs: { d: 'Two kongs that you made without claiming a discard.', h: '123s456s7z', w: '7z', m: [['kong', '1m', true], ['kong', '5p', true]], t: 'KC' },
   twoDragonPungs: { d: 'Pungs or kongs of two different dragons.', h: '123m456m7p', w: '7p', m: [['pung', '5z'], ['pung', '6z']], t: 'HP' },
-  // ---- 5
   concealedAndMeldedKong: { d: 'One concealed kong and one open kong.', h: '123s456s7z', w: '7z', m: [['kong', '1m', true], ['kong', '5p']], t: 'K' },
   // ---- 4
   outsideHand: { d: 'Every set and the pair contains a terminal (1 or 9) or an honor.', h: '123m789p123s999m1p', w: '1p', t: '' },
