@@ -416,3 +416,52 @@ button.wait .fan { font-size: .72rem; color: var(--muted); font-weight: 600; }
 @media (min-width: 700px) { .ex-tiles .tile { --tile-w: 38px; --tile-h: 51px; } }
 .fans a.fanlink { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--muted); }
 .fans a.fanlink:hover { color: var(--felt); }
+
+/* ---- bigger tiles and text on phones ---- */
+@media (max-width: 520px) {
+  html { font-size: 112.5%; }                 /* every rem grows by 12.5% */
+  .wrap { padding-left: 12px; padding-right: 12px; }
+  .card { padding: 14px 12px; }
+
+  /* palette: 5 big tiles per row instead of 9 tiny ones */
+  .palette .row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 8px; }
+  .palette .tile { --tile-w: 100%; --tile-h: auto; aspect-ratio: 1 / 1.32; }
+  .palette .tile .left { top: -6px; right: -6px; bottom: auto; min-width: 1.5em; height: 1.5em; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--felt); color: #fff; font-size: .75rem; }
+
+  /* your hand: 6 per row */
+  #hand, #win { --tile-w: calc((100vw - 24px - 24px - 5 * 6px) / 6); --tile-h: calc(var(--tile-w) * 1.32); gap: 6px; }
+  .meld .tile { --tile-w: 40px; --tile-h: 53px; }
+  .meld-tag { font-size: .72rem; }
+  .decomp .tile { --tile-w: 30px; --tile-h: 40px; }
+  .mini .tile { --tile-w: 28px; --tile-h: 37px; }
+  .waits .tile { --tile-w: 46px; --tile-h: 61px; }
+  button.wait .fan { font-size: .85rem; }
+  .ex-tiles .tile { --tile-w: 34px; --tile-h: 45px; }
+
+  /* bigger things to tap and read */
+  .btn, button.btn, select { min-height: 44px; font-size: 1rem; }
+  .small, .status, .opt { font-size: 1rem; }
+  .opt > span:first-child { font-size: .85rem; }
+  table.fans { font-size: 1rem; }
+  .fans .zh, .fans .mult { font-size: .9rem; }
+  .chip { font-size: .9rem; }
+  .total strong { font-size: 3.4rem; }
+  .chipbtn { font-size: 1rem; padding: 8px 14px; }
+}
+
+/* ---- the sticky mini hand (phones and tablets) ---- */
+.hand-strip { display: none; }
+@media (max-width: 900px) {
+  .hand-strip {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+    position: sticky; top: 0; z-index: 20;
+    margin: 0 -12px 10px; padding: 8px 12px;
+    background: var(--paper); border-bottom: 2px solid var(--accent);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, .12);
+  }
+  .hand-strip[hidden] { display: none; }
+  .hand-strip .grp { display: inline-flex; gap: 1px; }
+  .hand-strip .grp.win { padding-left: 6px; border-left: 2px dashed var(--accent); }
+  .hand-strip .tile { --tile-w: 22px; --tile-h: 29px; border-radius: 3px; }
+  .hand-strip .strip-count { margin-left: auto; font-weight: 700; color: var(--felt); }
+}

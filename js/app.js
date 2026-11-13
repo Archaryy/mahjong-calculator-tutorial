@@ -255,6 +255,35 @@
     return '';
   }
 
+  function renderStrip() { // a small copy of your hand that stays on screen while you scroll the big palette (phones)
+        const box = $('#hand-strip');
+        box.innerHTML = '';
+        box.hidden = total() === 0 && state.melds.length === 0;
+        state.melds.forEach((m) => {
+            const t = m.tile;
+            const tiles = m.type === 'chow' ? [t, t + 1, t + 2] : m.type === 'pung' ? [t, t, t] : [t, t, t, t];
+            const g = document.createElement('span');
+            g.className = 'grp';
+            tiles.forEach((x, k) => g.appendChild(tileEl(x, 'span', { back: m.type === 'kong' && m.concealed && (k === 0 || k === 3) })));
+            box.appendChild(g);
+        });
+        const g = document.createElement('span');
+        g.className = 'grp';
+        state.hand.forEach((x) => g.appendChild(tileEl(x, 'span')));
+        box.appendChild(g);
+        if (state.win !== null) {
+            const w = document.createElement('span');
+            w.className = 'grp win';
+            w.appendChild(tileEl(state.win, 'span'));
+            box.appendChild(w);
+        }
+        const n = document.createElement('span');
+        n.className = 'strip-count';
+        n.textContent = total() + '/' + (cap() + 1);
+        box.appendChild(n);
+  }
+  renderers.push(renderStrip);
+
   function renderPalette() {
     const u = usage();
     const box = $('#palette');
@@ -355,7 +384,7 @@
       if (state.melds.length === 0) {
           const p = document.createElement('span');
           p.className = 'small';
-          p.textContent = 'None yet. Pick tiles below, then tap them to form a chow, pung or kong.';
+          p.textContent = 'None yet. Pick tiles above, then tap them to form a chow, pung or kong.';
           melds.appendChild(p);
       }
       state.melds.forEach((m, idx) => {
