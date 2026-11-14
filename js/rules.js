@@ -91,7 +91,7 @@
     card.id = 'fan-' + f.id;
     card.dataset.search = (f.name + ' ' + f.zh + ' ' + d.d).toLowerCase();
     card.innerHTML =
-      '<summary><span class="pts">' + f.fan + '</span>' +
+      '<summary><span class="fan-pts">' + f.fan + '</span>' +
       '<span class="what"><span class="nm">' + esc(f.name) + '<span class="zh">' + esc(f.zh) + '</span></span>' +
       '<span class="ds">' + esc(d.d) + '</span></span></summary>';
     const body = document.createElement('div');
@@ -132,7 +132,7 @@
       currentFan = f.fan;
       section = document.createElement('section');
       section.className = 'tier';
-      section.innerHTML = '<h2><span class="pts">' + f.fan + '</span> fan <small></small></h2>';
+      section.innerHTML = '<h2><span class="fan-pts">' + f.fan + '</span> fan <small></small></h2>';
       list.appendChild(section);
     }
     const card = buildCard(f);

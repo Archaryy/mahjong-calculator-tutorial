@@ -394,7 +394,7 @@ button.wait .fan { font-size: .72rem; color: var(--muted); font-weight: 600; }
 .tier { margin: 14px 0 22px; }
 .tier h2 { font-size: 1rem; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
 .tier h2 small { font-weight: 400; color: var(--muted); font-size: .8rem; }
-.pts { display: inline-flex; align-items: center; justify-content: center; min-width: 2.4em; height: 2.4em; padding: 0 6px; border-radius: 10px; background: var(--felt); color: #fff; font-weight: 700; flex: none; }
+.fan-pts { display: inline-flex; align-items: center; justify-content: center; min-width: 2.4em; height: 2.4em; padding: 0 6px; border-radius: 10px; background: var(--felt); color: #fff; font-weight: 700; flex: none; }
 .fan-card { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; scroll-margin-top: 150px; }
 .fan-card[hidden], .tier[hidden] { display: none; }
 .fan-card summary { list-style: none; display: flex; gap: 12px; align-items: center; padding: 10px 12px; cursor: pointer; }
