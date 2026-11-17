@@ -1036,10 +1036,9 @@ document.addEventListener('keydown', (e) => {
 if (e.key === 'Escape') { state.sel = null; render(); }
 });
 
+window.App = {state: state, render: render, tileEl: tileEl, cap: cap };
+
   applyHash();
   render();
 
 })();
-
-
-
