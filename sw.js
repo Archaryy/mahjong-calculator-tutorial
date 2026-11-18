@@ -1,5 +1,5 @@
 // Service worker: keeps a copy of the app on the phone so it opens offline.
-const CACHE = 'mcr-calc-v8';
+const CACHE = 'mcr-calc-v9';
 
 const FILES = [
     './',

@@ -55,6 +55,7 @@
     $('#scan-use').hidden = true;
     $('#scan-canvas').hidden = true;
     $('#scan-tiles').innerHTML = '';
+    $('#scan-picker').hidden = true;
     try {
       await loadModel();
     } catch (e) {
@@ -102,29 +103,125 @@
       }
     });
     cv.hidden = false;
+    closePicker();
+    renderRow();
+  }
 
+  let editing = null;   // the tile number being edited, or null if none
+
+  function summary() {
+    const n = found.tiles.length;
+    if (!n) {
+      say('No tiles in the list. Tap + to add them, or try a closer photo, brighter light, or tiles in a straight row.');
+      return;
+    }
+    let text = n + ' tile' + (n === 1 ? '' : 's') + '.';
+    if (found.flowers.length) text += ' ' + found.flowers.length + ' flower' + (found.flowers.length === 1 ? '' : 's') + '.';
+    text += found.unsure.length ? ' Orange tiles (' + found.unsure.map((i) => i + 1).join(', ') + ') are uncertain: tap them to check or change.': ' Tap any tile to change or remove it.';
+    say(text);
+  }
+
+  function renderRow() {
     const row = $('#scan-tiles');
     row.innerHTML = '';
-    tiles.forEach((t, i) => {
-      const w = document.createElement('span');
-      w.className = 'scan-tile' + (unsure.includes(i) ? ' unsure' : '');
+    found.tiles.forEach((t, i) => {
+      const w = document.createElement('button');
+      w.type = 'button';
+      w.className = 'scan-tile' + (found.unsure.includes(i) ? ' unsure' : '') + (editing === i ? ' active' : '');
+      w.setAttribute('aria-label', 'Tile ' + (i + 1) + ': tap to change');
       const no = document.createElement('span');
       no.className = 'no';
       no.textContent = i + 1;
       w.appendChild(no);
       w.appendChild(App.tileEl(t, 'span'));
+      w.addEventListener('click', () => openPicker(i));
       row.appendChild(w);
     });
+    const add = document.createElement('button');
+    add.type = 'button';  
+    add.className = 'scan-add' + (editing === -1 ? ' active' : '');
+    add.textContent = '+';
+    add.setAttribute('aria-label', 'Add a tile the scan missed');
+    add.addEventListener('click', () => openPicker(-1));
+    row.appendChild(add);
+    $('#scan-use').hidden = !found.tiles.length;
+    summary();
+  }
 
-    if (!tiles.length) {
-      say('I could not find any tiles. Try a closer photo, brighter light, or tiles in a straight row.');
-      return;
+    function buildPicker() {
+    const box = $('#scan-picker');
+    box.innerHTML = '';
+    const title = document.createElement('p');
+    title.id = 'scan-picker-title';
+    title.className = 'picker-title';
+    box.appendChild(title);
+    [[0, 9], [9, 18], [18, 27], [27, 34]].forEach(([from, to]) => {
+      const r = document.createElement('div');
+      r.className = 'row';
+      for (let t = from; t < to; t++) {
+        const b = App.tileEl(t, 'button');
+        b.dataset.tile = t;
+        b.addEventListener('click', () => choose(t));
+        r.appendChild(b);
+      }
+      box.appendChild(r);
+    });
+    const acts = document.createElement('div');
+    acts.className = 'picker-actions';
+    acts.innerHTML = '<button type="button" class="btn" id="pk-keep">Keep this one</button>' +
+      '<button type="button" class="btn" id="pk-remove">Remove tile</button>' +
+      '<button type="button" class="btn" id="pk-cancel">Cancel</button>';
+    box.appendChild(acts);
+    $('#pk-keep').addEventListener('click', keepTile);
+    $('#pk-remove').addEventListener('click', removeTile);
+    $('#pk-cancel').addEventListener('click', closePicker);
+  }
+
+  function openPicker(i) {
+    editing = i;
+    const box = $('#scan-picker');
+    if (!box.firstChild) buildPicker();
+    $('#scan-picker-title').textContent = i === -1 ? 'Add a tile: pick it below' : 'Tile ' + (i + 1) + ': pick the right tile';
+    // a tile already used 4 times cannot be picked again
+    const used = new Array(34).fill(0);
+    found.tiles.forEach((t, j) => { if (j !== i) used[t]++; });
+    box.querySelectorAll('button[data-tile]').forEach((b) => {
+      const t = +b.dataset.tile;
+      b.disabled = used[t] >= 4;
+      b.classList.toggle('current', i >= 0 && found.tiles[i] === t);
+    });
+    $('#pk-keep').hidden = i === -1;
+    $('#pk-remove').hidden = i === -1;
+    box.hidden = false;
+    renderRow();
+    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  function closePicker() {
+    editing = null;
+    $('#scan-picker').hidden = true;
+    if (found) renderRow();
+  }
+
+    function dropUnsure(i) { found.unsure = found.unsure.filter((u) => u !== i); }
+
+  function choose(t) {
+    if (editing === -1) {
+      found.tiles.push(t);                 // a new tile goes at the right-hand end
+    } else {
+      found.tiles[editing] = t;
+      dropUnsure(editing);                 // the person has checked it, so it is no longer orange
     }
-    let text = 'Found ' + tiles.length + ' tile' + (tiles.length === 1 ? '' : 's') + '.';
-    if (found.flowers.length) text += ' ' + found.flowers.length + ' flower' + (found.flowers.length === 1 ? '' : 's') + '.';
-    if (unsure.length) text += ' Orange ones (' + unsure.map((i) => i + 1).join(', ') + ') are uncertain: please check them.';
-    say(text);
-    $('#scan-use').hidden = false;
+    closePicker();
+  }
+
+  function keepTile() { dropUnsure(editing); closePicker(); }
+
+  function removeTile() {
+    const i = editing;
+    found.tiles.splice(i, 1);
+    found.unsure = found.unsure.filter((u) => u !== i).map((u) => (u > i ? u - 1 : u));
+    closePicker();
   }
 
     function useTiles() {
@@ -146,10 +243,12 @@
     App.render();
   }
 
-  $('#scan-file').addEventListener('change', (e) => {
+  ['#scan-cam', '#scan-file'].forEach((sel) => {
+  $(sel).addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];
-    if (file) scan(file).catch((e) => { console.error(e); say('Something went wrong reading that photo. Try another one.'); });
+    if (file) scan(file).catch((err) => { console.error(err); say('Something went wrong reading that photo. Try another one.'); });
     e.target.value = '';   // so choosing the same photo again still works
   });
+});
   $('#scan-use').addEventListener('click', useTiles);
 })();

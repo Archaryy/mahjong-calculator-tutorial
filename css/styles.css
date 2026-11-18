@@ -472,3 +472,37 @@ button.wait .fan { font-size: .72rem; color: var(--muted); font-weight: 600; }
 .scan-tile .no { position: absolute; top: -8px; left: -6px; font-size: 11px; background: #1f7a3d; color: #fff; border-radius: 8px; padding: 0 5px; z-index: 1; }
 .scan-tile.unsure .no { background: #e08a00; }
 .scan-tile.unsure .tile { outline: 2px solid #e08a00; }
+
+#scan-msg { margin: 8px 0; line-height: 1.45; }
+.scan-canvas { display: block; width: 100%; height: auto; border-radius: 12px; margin: 10px 0; border: 1px solid var(--line); }
+
+.scan-tiles { display: flex; flex-wrap: wrap; gap: 14px 8px; margin: 10px 0; padding: 12px 8px 8px; background: rgba(0,0,0,.035); border-radius: 12px; }
+button.scan-tile { position: relative; display: inline-block; padding: 0; margin: 0; background: none; border: 0; border-radius: 8px; cursor: pointer; font: inherit; }
+.scan-tile .tile { --tile-w: 40px; --tile-h: 53px; pointer-events: none; }
+.scan-tile .no { position: absolute; top: -8px; left: -6px; z-index: 1; min-width: 1.5em; height: 1.5em; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--felt); color: #fff; font-size: .72rem; font-weight: 700; }
+.scan-tile.unsure .no { background: #e08a00; }
+.scan-tile.unsure .tile { outline: 3px solid #e08a00; outline-offset: 1px; border-radius: 6px; }
+.scan-tile.active .tile { outline: 3px solid #1769e0; outline-offset: 1px; border-radius: 6px; }
+button.scan-add { width: 40px; height: 53px; align-self: flex-end; border: 2px dashed var(--line); border-radius: 8px; background: transparent; color: var(--muted); font-size: 1.6rem; line-height: 1; cursor: pointer; }
+button.scan-add.active, button.scan-add:hover { border-color: #1769e0; color: #1769e0; }
+
+.scan-picker { margin: 10px 0; padding: 12px; border: 2px solid #1769e0; border-radius: 12px; background: var(--card, #fff); }
+.scan-picker[hidden] { display: none; }
+.scan-picker .picker-title { margin: 0 0 10px; font-weight: 700; }
+.scan-picker .row { display: grid; grid-template-columns: repeat(9, 1fr); gap: 5px; margin-bottom: 6px; }
+.scan-picker .tile { --tile-w: 100%; --tile-h: auto; aspect-ratio: 1 / 1.32; }
+.scan-picker .tile.current { outline: 3px solid #e08a00; outline-offset: 1px; border-radius: 6px; }
+.picker-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.picker-actions .btn[hidden] { display: none; }
+#scan-use { margin-top: 6px; }
+
+@media (max-width: 520px) {
+  .scan-tile .tile, button.scan-add { --tile-w: 44px; --tile-h: 58px; width: 44px; }
+  button.scan-add { height: 58px; }
+  .scan-tiles { gap: 16px 9px; }
+  .scan-picker .row { grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 8px; }
+  .picker-actions .btn { flex: 1 1 auto; min-height: 46px; }
+  #scan-use { width: 100%; min-height: 50px; font-size: 1.05rem; }
+}
+
+.scan-row { margin: 10px 0; display: flex; flex-wrap: wrap; gap: 8px; }
