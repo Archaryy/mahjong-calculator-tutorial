@@ -51,6 +51,37 @@
     return new window.ort.Tensor('float32', data, [1, 3, SIZE, SIZE]);
   }
 
+    // run the model once on a picture (a bitmap or a canvas) and return the cleaned-up boxes
+  async function detect(img) {
+    const lb = letterbox(img.width, img.height, SIZE);
+    const out = await session.run({ [session.inputNames[0]]: photoToTensor(img, lb) });
+    const result = out[session.outputNames[0]];
+    const n = result.dims[2];
+    const numClasses = result.dims[1] - 4;
+    return nms(decodeYolo(result.data, numClasses, n, lb, CONF), 0.5);
+  }
+
+  // how good a reading is: more tiles and more confident tiles both raise it
+  function quality(dets) { return dets.reduce((sum, d) => sum + d.score, 0); }
+
+  // turn a picture by some degrees (clockwise is positive) on a bigger canvas so no corner is cut off
+  function rotateImage(img, deg) {
+    const r = deg * Math.PI / 180;
+    const cos = Math.abs(Math.cos(r)), sin = Math.abs(Math.sin(r));
+    const w = Math.round(img.width * cos + img.height * sin);
+    const h = Math.round(img.width * sin + img.height * cos);
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgb(114,114,114)';                // the same grey as the model's padding
+    ctx.fillRect(0, 0, w, h);
+    ctx.translate(w / 2, h / 2);
+    ctx.rotate(r);
+    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+    return c;
+  }
+
   async function scan(file) {
     $('#scan-use').hidden = true;
     $('#scan-canvas').hidden = true;
@@ -64,19 +95,38 @@
         : 'Could not load the scanner. Check your connection and try again.');
       return;
     }
-    say('Reading the photo…');
-    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-    const lb = letterbox(bitmap.width, bitmap.height, SIZE);
-    const out = await session.run({ [session.inputNames[0]]: photoToTensor(bitmap, lb) });
-    const result = out[session.outputNames[0]];
-    const n = result.dims[2];
-    const numClasses = result.dims[1] - 4;
-    const dets = nms(decodeYolo(result.data, numClasses, n, lb, CONF), 0.5);
-    found = toHand(dets, classCodes, UNSURE);
-    found.bitmap = bitmap;
+    say('Reading the photo\u2026');
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });   // <- this line was missing
+    let best = { img: bitmap, dets: await detect(bitmap), turned: 0 };
+
+    // A photo taken at an angle: straighten it and look again, then keep whichever pass read better.
+    const tries = [];
+    const est = window.ScanCore.rowAngle(best.dets);
+    if (est !== null && Math.abs(est) >= 5) tries.push(est);        // the row's own slope, measured
+    if (best.dets.length < 8) tries.push(-25, 25);                  // too few tiles seen: try turning blindly
+    for (const deg of tries) {
+      say('Straightening the photo\u2026');
+      const img = rotateImage(bitmap, -deg);
+      const dets = await detect(img);
+      if (quality(dets) > quality(best.dets) * 1.05) best = { img: img, dets: dets, turned: deg };
+    }
+
+    found = toHand(best.dets, classCodes, UNSURE);
+    found.bitmap = best.img;
+    found.turned = best.turned;
     show();
   }
 
+    // a rectangle path with rounded corners (drawn by hand so it works in every browser)
+  function roundedRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
     // draw the photo with a numbered box round every tile found
   function show() {
     const { bitmap, ordered, unsure, tiles } = found;
@@ -86,20 +136,40 @@
     cv.height = Math.round(bitmap.height * k);
     const ctx = cv.getContext('2d');
     ctx.drawImage(bitmap, 0, 0, cv.width, cv.height);
-    ctx.lineWidth = 3;
-    ctx.font = '700 ' + Math.max(14, Math.round(cv.width / 40)) + 'px system-ui, sans-serif';
-
+        const lw = Math.max(2, Math.round(cv.width / 320));       // line thickness grows with the picture
+    ctx.lineWidth = lw;
+    ctx.lineJoin = 'round';
+    ctx.font = '700 ' + Math.max(12, Math.round(cv.width / 45)) + 'px system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
     let tileNo = 0;
     ordered.forEach((d) => {
       const t = window.ScanCore.codeToTile(classCodes[d.cls]);
       const isTile = t >= 0 && t < 34;
       const weak = isTile && unsure.includes(tileNo);
-      ctx.strokeStyle = weak ? '#e08a00' : '#1f7a3d';    // orange = check this one
-      ctx.strokeRect(d.x1 * k, d.y1 * k, (d.x2 - d.x1) * k, (d.y2 - d.y1) * k);
+      const color = weak ? '#f0a000' : '#27c05a';
+      const x = d.x1 * k, y = d.y1 * k, w = (d.x2 - d.x1) * k, h = (d.y2 - d.y1) * k;
+      const rad = Math.min(8, w / 5, h / 5);
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,.55)';                     // a dark glow so the box shows on any background
+      ctx.shadowBlur = 4;
+      ctx.fillStyle = color + '26';                            // the colour at about 15% see-through
+      roundedRect(ctx, x, y, w, h, rad);
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.stroke();
+      ctx.restore();
       if (isTile) {
         tileNo++;
-        ctx.fillStyle = ctx.strokeStyle;
-        ctx.fillText(String(tileNo), d.x1 * k + 3, d.y1 * k - 5 < 14 ? d.y1 * k + 16 : d.y1 * k - 5);
+        const label = String(tileNo);
+        const pw = Math.max(ctx.measureText(label).width + 10, 20), ph = 20 + Math.round(cv.width / 400);
+        const px = Math.min(Math.max(x + w / 2 - pw / 2, 2), cv.width - pw - 2);     // the number sits on the top edge, centred
+        const py = Math.max(y - ph / 2, 2);
+        ctx.fillStyle = color;
+        roundedRect(ctx, px, py, pw, ph, ph / 2);
+        ctx.fill();
+        ctx.fillStyle = weak ? '#2b1a00' : '#06210f';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, px + pw / 2, py + ph / 2 + 1);
       }
     });
     cv.hidden = false;

@@ -54,25 +54,57 @@
     return keep;
   }
 
+  // angling tiles that are not laid flat 90 degrees or so
+  // 0 = flat, positive = right hand is lower, vice versa.
+  function rowAngle(dets) {
+    if (dets.length < 4) return null;
+    const pts = dets.map((d) => [(d.x1 + d.x2) / 2, (d.y1 + d.y2) / 2]);
+    const n = pts.length;
+    const mx = pts.reduce((s, p) => s + p[0], 0) / n;
+    const my = pts.reduce((s, p) => s + p[1], 0) / n;
+    let sxx = 0, syy = 0, sxy = 0;
+    pts.forEach((p) => {
+      sxx += (p[0] - mx) * (p[0] - mx);
+      syy += (p[1] - my) * (p[1] - my);
+      sxy += (p[0] - mx) * (p[1] - my);
+    });
+
+    const theta = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    const mid = (sxx + syy) / 2;
+    const diff = Math.sqrt(((sxx - sxy) / 2) * ((sxx - syy) / 2) + sxy * sxy);
+    const major = mid + diff, minor = mid - diff;
+    if (minor > 0 && major / minor < 6) return null;
+    let deg = theta * 180 / Math.PI;
+    if (deg > 90) deg -= 180;
+    if (deg <= -90) deg += 180;
+    return deg;
+  }
+
   // 5. Put tiles in reading order: row by row, left to right
   function readingOrder(dets) {
     if (!dets.length) return [];
+    const ang = rowAngle(dets);
+    const rad = ang !== null && Math.abs(ang) > 2 ? -ang * Math.PI / 180 : 0;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    const items = dets.map((d) => {
+      const cx = (d.x1 + d.x2) / 2, cy = (d.y1 + d.y2) / 2;
+      return { d: d, u: cx * cos - cy * sin, v: cx * sin + cy * cos };   // u along the row, v across it
+    });
     const heights = dets.map((d) => d.y2 - d.y1).sort((a, b) => a - b);
-    const rowGap = heights[Math.floor(heights.length / 2)] * 0.6; // 60% of a typical tile height
-    const byY = dets.slice().sort((a, b) => (a.y1 + a.y2) - (b.y1 + b.y2));
+    const rowGap = heights[Math.floor(heights.length / 2)] * 0.6;
+    const byV = items.slice().sort((a, b) => a.v - b.v);
     const rows = [];
-    byY.forEach((d) => {
-      const cy = (d.y1 + d.y2) / 2;
+    byV.forEach((it) => {
       const row = rows[rows.length - 1];
-      if (row && Math.abs(cy - row.cy) <= rowGap) {
-        row.items.push(d);
-        row.cy = row.items.reduce((s, t) => s + (t.y1 + t.y2) / 2, 0) / row.items.length;
+      if (row && Math.abs(it.v - row.v) <= rowGap) {
+        row.items.push(it);
+        row.v = row.items.reduce((s, t) => s + t.v, 0) / row.items.length;
       } else {
-        rows.push({ cy: cy, items: [d] });
+        rows.push({ v: it.v, items: [it] });
       }
     });
     const out = [];
-    rows.forEach((r) => r.items.sort((a, b) => a.x1 - b.x1).forEach((d) => out.push(d)));
+    rows.forEach((r) => r.items.sort((a, b) => a.u - b.u).forEach((it) => out.push(it.d)));
     return out;
   }
     // 6. Class names to tile numbers. "5m" -> 4, "1p" -> 9, "3z" -> 29, "f2" -> flower 2.
@@ -107,7 +139,7 @@
     return { tiles: tiles, flowers: flowers, unsure: unsure, unknown: unknown, ordered: ordered };
   }
 
-  const api = { letterbox, decodeYolo, iou, nms, readingOrder, codeToTile, toHand };
+  const api = { letterbox, decodeYolo, iou, nms, rowAngle, readingOrder, codeToTile, toHand };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ScanCore = api;
 })(typeof window !== 'undefined' ? window : globalThis);
