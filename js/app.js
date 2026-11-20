@@ -1036,7 +1036,24 @@ document.addEventListener('keydown', (e) => {
 if (e.key === 'Escape') { state.sel = null; render(); }
 });
 
-window.App = {state: state, render: render, tileEl: tileEl, cap: cap };
+function previewScore (tiles, flowerCount) {
+  if (tiles.length !== 14) return null;
+  return score ({
+    melds: [],
+    hand: tiles.slice(0, 13),
+    win: tiles[13],
+    selfDrawn: state.selfDrawn,
+    prevalent: state.prevalent,
+    seat: state.seat,
+    flowers: flowerCount,
+    lastTile: state.lastTile,
+    lastOfWall: state.lastOfWall,
+    replacement: state.replacement,
+    robbing: state.robbing,
+  });
+
+}
+window.App = {state: state, render: render, tileEl: tileEl, cap: cap, preview: previewScore};
 
   applyHash();
   render();

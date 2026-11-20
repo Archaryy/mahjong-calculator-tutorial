@@ -83,7 +83,7 @@
   }
 
   async function scan(file) {
-    $('#scan-use').hidden = true;
+    $('#scan-foot').hidden = true;
     $('#scan-canvas').hidden = true;
     $('#scan-tiles').innerHTML = '';
     $('#scan-picker').hidden = true;
@@ -214,62 +214,112 @@
     add.setAttribute('aria-label', 'Add a tile the scan missed');
     add.addEventListener('click', () => openPicker(-1));
     row.appendChild(add);
-    $('#scan-use').hidden = !found.tiles.length;
-    summary();
+    $('#scan-foot').hidden = !found.tiles.length;
+    showScore();
   }
 
-    function buildPicker() {
+    function scoreText() {
+    const n = found.tiles.length;
+    if (n !== 14) return { cls: 'wait', text: n + ' of 14 tiles' };
+    const r = window.App.preview(found.tiles, found.flowers.length);
+    if (!r || !r.valid) return { cls: 'bad', text: 'Not a winning hand' };
+    return r.meetsMinimum
+      ? { cls: 'good', text: r.total + ' fan' }
+      : { cls: 'low', text: r.total + ' fan (8 needed)' };
+  }
+
+  function showScore() {
+    const t = scoreText();
+    const el = $('#scan-score');
+    el.className = 'scan-score ' + t.cls;
+    el.textContent = t.text;
+    const pk = $('#pk-score');
+    if (pk) { pk.className = 'chip ' + t.cls; pk.textContent = t.text; }
+  }
+
+  const TABS = [
+    { name: 'Characters', from: 0, to: 9 },
+    { name: 'Dots', from: 9, to: 18 },
+    { name: 'Bamboo', from: 18, to: 27 },
+    { name: 'Winds & dragons', from: 27, to: 34 },
+  ];
+  let tab = 0;
+
+  function buildPicker() {
     const box = $('#scan-picker');
-    box.innerHTML = '';
-    const title = document.createElement('p');
-    title.id = 'scan-picker-title';
-    title.className = 'picker-title';
-    box.appendChild(title);
-    [[0, 9], [9, 18], [18, 27], [27, 34]].forEach(([from, to]) => {
-      const r = document.createElement('div');
-      r.className = 'row';
-      for (let t = from; t < to; t++) {
-        const b = App.tileEl(t, 'button');
-        b.dataset.tile = t;
-        b.addEventListener('click', () => choose(t));
-        r.appendChild(b);
-      }
-      box.appendChild(r);
+    box.innerHTML =
+      '<div class="sheet-backdrop"></div>' +
+      '<div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="scan-picker-title" tabindex="-1">' +
+        '<div class="sheet-grab"></div>' +
+        '<div class="sheet-head"><p id="scan-picker-title" class="picker-title"></p><span id="pk-score" class="chip"></span></div>' +
+        '<div class="suit-tabs" role="tablist"></div>' +
+        '<div class="tile-grid"></div>' +
+        '<div class="picker-actions">' +
+          '<button type="button" class="btn" id="pk-keep">Keep</button>' +
+          '<button type="button" class="btn" id="pk-remove">Remove</button>' +
+          '<button type="button" class="btn" id="pk-cancel">Cancel</button>' +
+        '</div>' +
+      '</div>';
+    const tabs = box.querySelector('.suit-tabs');
+    TABS.forEach((t, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.textContent = t.name;
+      b.addEventListener('click', () => { tab = i; renderGrid(); });
+      tabs.appendChild(b);
     });
-    const acts = document.createElement('div');
-    acts.className = 'picker-actions';
-    acts.innerHTML = '<button type="button" class="btn" id="pk-keep">Keep this one</button>' +
-      '<button type="button" class="btn" id="pk-remove">Remove tile</button>' +
-      '<button type="button" class="btn" id="pk-cancel">Cancel</button>';
-    box.appendChild(acts);
+    box.querySelector('.sheet-backdrop').addEventListener('click', closePicker);
     $('#pk-keep').addEventListener('click', keepTile);
     $('#pk-remove').addEventListener('click', removeTile);
     $('#pk-cancel').addEventListener('click', closePicker);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && editing !== null) closePicker(); });
+  }
+
+  // draw the tiles of the chosen tab; a tile already used 4 times is greyed out
+  function renderGrid() {
+    const box = $('#scan-picker');
+    box.querySelectorAll('.suit-tabs button').forEach((b, i) => b.setAttribute('aria-selected', String(i === tab)));
+    const used = new Array(34).fill(0);
+    found.tiles.forEach((t, j) => { if (j !== editing) used[t]++; });
+    const grid = box.querySelector('.tile-grid');
+    grid.innerHTML = '';
+    for (let t = TABS[tab].from; t < TABS[tab].to; t++) {
+      const b = App.tileEl(t, 'button');
+      b.disabled = used[t] >= 4;
+      if (editing >= 0 && found.tiles[editing] === t) b.classList.add('current');
+      b.addEventListener('click', () => choose(t));
+      grid.appendChild(b);
+    }
   }
 
   function openPicker(i) {
     editing = i;
     const box = $('#scan-picker');
     if (!box.firstChild) buildPicker();
-    $('#scan-picker-title').textContent = i === -1 ? 'Add a tile: pick it below' : 'Tile ' + (i + 1) + ': pick the right tile';
-    // a tile already used 4 times cannot be picked again
-    const used = new Array(34).fill(0);
-    found.tiles.forEach((t, j) => { if (j !== i) used[t]++; });
-    box.querySelectorAll('button[data-tile]').forEach((b) => {
-      const t = +b.dataset.tile;
-      b.disabled = used[t] >= 4;
-      b.classList.toggle('current', i >= 0 && found.tiles[i] === t);
-    });
+    $('#scan-picker-title').textContent = i === -1 ? 'Add a tile' : 'Tile ' + (i + 1) + ': which one is it?';
+    // open on the suit of the tile being changed: most mistakes are inside one suit
+    tab = i >= 0 ? TABS.findIndex((t) => found.tiles[i] >= t.from && found.tiles[i] < t.to) : 0;
     $('#pk-keep').hidden = i === -1;
     $('#pk-remove').hidden = i === -1;
+    renderRow();                                   // marks the tile being changed
+    // keep the tapped tile visible above the sheet
+    const el = i >= 0 ? $('#scan-tiles').children[i] : $('#scan-tiles').lastElementChild;
+    if (el) {
+      const room = window.innerHeight * 0.4;
+      const r = el.getBoundingClientRect();
+      if (r.bottom > room) window.scrollBy(0, r.bottom - room + 16);
+    }
+    renderGrid();
     box.hidden = false;
-    renderRow();
-    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    document.body.classList.add('sheet-open');
+    box.querySelector('.sheet-panel').focus({ preventScroll: true });
   }
 
   function closePicker() {
     editing = null;
     $('#scan-picker').hidden = true;
+    document.body.classList.remove('sheet-open');
     if (found) renderRow();
   }
 
@@ -294,7 +344,7 @@
     closePicker();
   }
 
-    function useTiles() {
+  function useTiles() {
     const st = App.state;
     const goal = App.cap() + 1;                       // 14 tiles with no declared sets
     let tiles = found.tiles.slice();

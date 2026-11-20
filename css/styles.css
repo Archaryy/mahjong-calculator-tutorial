@@ -485,24 +485,34 @@ button.scan-tile { position: relative; display: inline-block; padding: 0; margin
 .scan-tile.active .tile { outline: 3px solid #1769e0; outline-offset: 1px; border-radius: 6px; }
 button.scan-add { width: 40px; height: 53px; align-self: flex-end; border: 2px dashed var(--line); border-radius: 8px; background: transparent; color: var(--muted); font-size: 1.6rem; line-height: 1; cursor: pointer; }
 button.scan-add.active, button.scan-add:hover { border-color: #1769e0; color: #1769e0; }
+.scan-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 6px; position: sticky; bottom: 0; z-index: 5; padding: 10px 0 calc(10px + env(safe-area-inset-bottom)); background: var(--paper); border-top: 1px solid var(--line); }
+.scan-foot[hidden] { display: none; }
+.chip, .scan-score { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 999px; font-weight: 700; font-size: .95rem; background: #ece7d6; color: var(--ink); }
+.chip.good, .scan-score.good { background: #d9f2e0; color: #11602e; }
+.chip.low, .scan-score.low { background: #fdeccb; color: #7a4a00; }
+.chip.bad, .scan-score.bad { background: #fbdcdc; color: #8a1c1c; }
+.btn.primary { background: var(--felt); color: #fff; border-color: var(--felt); font-weight: 700; }
 
-.scan-picker { margin: 10px 0; padding: 12px; border: 2px solid #1769e0; border-radius: 12px; background: var(--card, #fff); }
+.scan-picker { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: flex-end; justify-content: center; }
 .scan-picker[hidden] { display: none; }
-.scan-picker .picker-title { margin: 0 0 10px; font-weight: 700; }
-.scan-picker .row { display: grid; grid-template-columns: repeat(9, 1fr); gap: 5px; margin-bottom: 6px; }
-.scan-picker .tile { --tile-w: 100%; --tile-h: auto; aspect-ratio: 1 / 1.32; }
-.scan-picker .tile.current { outline: 3px solid #e08a00; outline-offset: 1px; border-radius: 6px; }
-.picker-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.sheet-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .45); }
+.sheet-panel { position: relative; width: min(100%, 560px); max-height: 85vh; overflow-y: auto; background: var(--tile-bg); border-radius: 18px 18px 0 0; padding: 8px 14px calc(14px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 30px rgba(0, 0, 0, .25); outline: none; animation: sheet-up .18s ease-out; }
+@keyframes sheet-up { from { transform: translateY(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+.sheet-grab { width: 42px; height: 4px; border-radius: 2px; background: var(--line); margin: 4px auto 10px; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.picker-title { margin: 0; font-weight: 700; font-size: 1.05rem; }
+.suit-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0; }
+.suit-tabs button { padding: 10px 2px; border: 1px solid var(--line); border-radius: 10px; background: transparent; font: inherit; font-size: .85rem; line-height: 1.15; cursor: pointer; color: var(--ink); }
+.suit-tabs button[aria-selected="true"] { background: var(--felt); border-color: var(--felt); color: #fff; font-weight: 700; }
+.tile-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.tile-grid .tile { --tile-w: 100%; --tile-h: auto; aspect-ratio: 1 / 1.32; }
+.tile-grid .tile.current { outline: 3px solid #f0a000; outline-offset: 1px; border-radius: 6px; }
+.picker-actions { display: flex; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.picker-actions .btn { flex: 1 1 0; min-height: 46px; }
 .picker-actions .btn[hidden] { display: none; }
-#scan-use { margin-top: 6px; }
-
-@media (max-width: 520px) {
-  .scan-tile .tile, button.scan-add { --tile-w: 44px; --tile-h: 58px; width: 44px; }
-  button.scan-add { height: 58px; }
-  .scan-tiles { gap: 16px 9px; }
-  .scan-picker .row { grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 8px; }
-  .picker-actions .btn { flex: 1 1 auto; min-height: 46px; }
-  #scan-use { width: 100%; min-height: 50px; font-size: 1.05rem; }
+body.sheet-open { overflow: hidden; }
+@media (min-width: 700px) {
+  .scan-picker { align-items: center; }
+  .sheet-panel { border-radius: 18px; }
+  .tile-grid { grid-template-columns: repeat(9, 1fr); }
 }
-
-.scan-row { margin: 10px 0; display: flex; flex-wrap: wrap; gap: 8px; }
