@@ -255,73 +255,146 @@
     return '';
   }
 
-  function renderStrip() { // a small copy of your hand that stays on screen while you scroll the big palette (phones)
-        const box = $('#hand-strip');
-        box.innerHTML = '';
-        box.hidden = total() === 0 && state.melds.length === 0;
-        state.melds.forEach((m) => {
-            const t = m.tile;
-            const tiles = m.type === 'chow' ? [t, t + 1, t + 2] : m.type === 'pung' ? [t, t, t] : [t, t, t, t];
-            const g = document.createElement('span');
-            g.className = 'grp';
-            tiles.forEach((x, k) => g.appendChild(tileEl(x, 'span', { back: m.type === 'kong' && m.concealed && (k === 0 || k === 3) })));
-            box.appendChild(g);
-        });
-        const g = document.createElement('span');
-        g.className = 'grp';
-        state.hand.forEach((x) => g.appendChild(tileEl(x, 'span')));
-        box.appendChild(g);
-        if (state.win !== null) {
-            const w = document.createElement('span');
-            w.className = 'grp win';
-            w.appendChild(tileEl(state.win, 'span'));
-            box.appendChild(w);
-        }
-        const n = document.createElement('span');
-        n.className = 'strip-count';
-        n.textContent = total() + '/' + (cap() + 1);
-        box.appendChild(n);
+  const ready = () => state.win !== null && state.hand.length === cap(); // complete enough to score?
+
+  function pendingText() { // what to do next; used by the score bar and the breakdown
+    const t = total();
+    const goal = cap() + 1;
+    if (t > goal) return 'You have ' + t + ' tiles but a hand needs ' + goal + '. Tap a tile you hold four of and declare it as a kong.';
+    if (t === goal) return 'Now tap the tile you won with and choose "This is the winning tile".';
+    if (state.win === null && state.hand.length === cap()) return 'Your hand is ready and waiting. Tap a winning tile below, or add the tile you won with.';
+    const need = goal - t;
+    return 'Add ' + need + ' more tile' + (need === 1 ? '' : 's') + ' to complete the hand (' + t + '/' + goal + ').';
   }
-  renderers.push(renderStrip);
+
+  let lastTotal = null;
+  function renderScoreboard() { // the bar at the top: live total, what is missing, and a small copy of your hand
+    const bar = $('#scoreboard');
+    const box = $('#sb-hand');
+    const r = ready() ? score(scoreInput(state.win)) : null;
+
+    let st = 'pending', text = pendingText(), shown = '–';
+    if (r && !r.valid) { st = 'bad'; text = r.error; }
+    else if (r) {
+      shown = String(r.total);
+      st = r.meetsMinimum ? 'ok' : 'low';
+      text = r.meetsMinimum ? 'Valid win (8+ fan)' : 'Only ' + r.base + ' fan without flowers: needs 8 to win';
+    }
+    if (total() === 0 && state.melds.length === 0) text = 'Add tiles to start. The score shows up here and stays in view.';
+
+    bar.dataset.state = st;
+    $('#sb-status').textContent = text;
+    $('#sb-total').textContent = shown;
+    const btn = $('#sb-score');
+    btn.disabled = !r || !r.valid;
+    btn.setAttribute('aria-label', btn.disabled ? 'No score yet' : shown + ' fan. Show the score breakdown');
+    if (shown !== lastTotal) { // a little pop whenever the number changes
+      btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop');
+      lastTotal = shown;
+    }
+
+    box.innerHTML = '';
+    state.melds.forEach((m) => {
+      const t = m.tile;
+      const tiles = m.type === 'chow' ? [t, t + 1, t + 2] : m.type === 'pung' ? [t, t, t] : [t, t, t, t];
+      const g = document.createElement('span');
+      g.className = 'grp';
+      tiles.forEach((x, k) => g.appendChild(tileEl(x, 'span', { back: m.type === 'kong' && m.concealed && (k === 0 || k === 3) })));
+      box.appendChild(g);
+    });
+    const g = document.createElement('span');
+    g.className = 'grp';
+    state.hand.forEach((x) => g.appendChild(tileEl(x, 'span')));
+    box.appendChild(g);
+    if (state.win !== null) {
+      const w = document.createElement('span');
+      w.className = 'grp win';
+      w.appendChild(tileEl(state.win, 'span'));
+      box.appendChild(w);
+    }
+    const n = document.createElement('span');
+    n.className = 'sb-count';
+    n.textContent = total() + '/' + (cap() + 1);
+    box.appendChild(n);
+  }
+  renderers.push(renderScoreboard);
+
+  $('#sb-score').addEventListener('click', () => { // tapping the number scrolls down to the breakdown
+    $('#breakdown').scrollIntoView({
+      behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'start'
+    });
+  });
+
+  // the tray shows one suit at a time, so it stays short and your hand stays in view
+  const TRAY = [
+    { glyph: '萬', label: 'Chars',   from: 0,  to: 9 },
+    { glyph: '筒', label: 'Dots',    from: 9,  to: 18 },
+    { glyph: '索', label: 'Bamboo',  from: 18, to: 27 },
+    { glyph: '字', label: 'Honors',  from: 27, to: 34 },
+    { glyph: '花', label: 'Flowers', from: 34, to: 42 },
+  ];
+  let trayTab = 0; // which suit is open
+
+  (function buildTrayTabs() { // built once, so the tab you tapped keeps keyboard focus
+    const box = $('#palette-tabs');
+    TRAY.forEach((t, k) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tray-tab';
+      b.innerHTML = '<span class="g">' + t.glyph + '</span><span class="n">' + t.label + '</span><span class="cnt"></span>';
+      b.addEventListener('click', () => { trayTab = k; renderPalette(); });
+      box.appendChild(b);
+    });
+  })();
 
   function renderPalette() {
     const u = usage();
+    const focused = document.activeElement && document.activeElement.closest && document.activeElement.closest('#palette');
+    const keepFocus = focused ? document.activeElement.dataset.tile : null;
+
+    // tabs: which one is open, and how many tiles of that suit you already hold
+    $('#palette-tabs').querySelectorAll('.tray-tab').forEach((b, k) => {
+      const t = TRAY[k];
+      let held = 0;
+      if (t.from >= 34) held = state.flowers.length;
+      else for (let i = t.from; i < t.to; i++) held += u[i];
+      b.setAttribute('aria-pressed', String(k === trayTab));
+      b.querySelector('.cnt').textContent = held || '';
+      b.setAttribute('aria-label', t.label + (held ? ', ' + held + ' in your hand' : ''));
+    });
+
     const box = $('#palette');
     box.innerHTML = '';
-    const rows = [
-      Array.from({ length: 9}, (_, k) => k),
-      Array.from({ length: 9}, (_, k) => 9 + k),
-      Array.from({ length: 9}, (_, k) => 18 + k),
-      Array.from({ length: 7}, (_, k) => 27 + k),
-      Array.from({ length: 8}, (_, k) => 34 + k), // flowers
-    ];
-    for (const row of rows) {
-      const r = document.createElement('div');
-      r.className = row[0] >= 34 ? 'row flowers-row' : 'row';
-      for (const i of row) {
-        const b = tileEl(i, 'button');
-        if (i >= 34) { // flower (only one of each exists)
-          b.disabled = state.flowers.includes(i - 34);
-          b.addEventListener('click', () => addFlower(i - 34));
-        }
-        else {
-          const left = 4 - u[i];
-          const badge  = document.createElement('span');
-          badge.className = 'left';
-          badge.textContent = left;
-          b.appendChild(badge);
-          b.disabled = left === 0;
-          b.addEventListener('click', () => pick(i));
-        }
-        r.appendChild(b);
+    const r = document.createElement('div');
+    r.className = 'row';
+    for (let i = TRAY[trayTab].from; i < TRAY[trayTab].to; i++) {
+      const b = tileEl(i, 'button');
+      b.dataset.tile = i;
+      if (i >= 34) { // flower (only one of each exists)
+        b.disabled = state.flowers.includes(i - 34);
+        b.addEventListener('click', () => addFlower(i - 34));
       }
-      box.appendChild(r);
+      else {
+        const left = 4 - u[i];
+        const badge  = document.createElement('span');
+        badge.className = 'left';
+        badge.textContent = left;
+        b.appendChild(badge);
+        b.disabled = left === 0;
+        b.addEventListener('click', () => pick(i));
+      }
+      r.appendChild(b);
+    }
+    box.appendChild(r);
+    if (keepFocus !== null && keepFocus !== undefined) {
+      const nb = box.querySelector('[data-tile="' + keepFocus + '"]');
+      if (nb && !nb.disabled) nb.focus({ preventScroll: true });
     }
     const st = $('#status');
     st.textContent = hintText();
     st.className = 'status' + (state.msg ? '' : ' hint');
   }
-
   renderers.push(renderPalette);
 
   // render : buttons under hand
@@ -347,7 +420,7 @@
       if (!s) {
           const p = document.createElement('span');
           p.className = 'small';
-          p.textContent = state.hand.length ? 'Tap a tile in your hand to see what you can do with it.' : '';
+          p.textContent = state.hand.length ? 'Tap a tile in your hand to make a chow, pung or kong, or to mark it as the winning tile.' : 'Tiles you pick will appear on the table above.';;
           box.appendChild(p);
           return;
       }
@@ -381,12 +454,7 @@
   function renderHand() {
       const melds = $('#melds');
       melds.innerHTML = '';
-      if (state.melds.length === 0) {
-          const p = document.createElement('span');
-          p.className = 'small';
-          p.textContent = 'None yet. Pick tiles above, then tap them to form a chow, pung or kong.';
-          melds.appendChild(p);
-      }
+      $('#melds-zone').hidden = state.melds.length === 0; // no empty box until you declare a set
       state.melds.forEach((m, idx) => {
           const b = document.createElement('button');
           b.type = 'button';
@@ -461,7 +529,7 @@
     if (state.flowers.length === 0) {
       const p = document.createElement('span');
       p.className = 'small';
-      p.textContent = 'None. Tap a flower tile above if you hold any (1 fan each).';
+      p.textContent = 'None yet. Flowers are 1 fan each (see the Flowers tab).';
       box.appendChild(p);
     }
     state.flowers.forEach((k) => {
@@ -469,43 +537,67 @@
       b.addEventListener('click', () => removeFlower(k));
       box.appendChild(b);
     });
-    $('#flower-count').textContent = '(' + state.flowers.length + ' of 8, tap to remove)';
+    $('#flower-count').textContent = state.flowers.length ? '(' + state.flowers.length + ' of 8, tap to remove)' : '(0 of 8)';
   }
 
   renderers.push(renderFlowers);
 
   $('#clear').addEventListener('click', clearAll);
 
-  function optHTML(title, inner) {
-      return '<div class="opt"><span>' + title + '</span>' + inner + '</div>';
+  const WIND_ZH = ['東', '南', '西', '北'];
+
+  function group(title, inner) {
+      return '<div class="opt-group"><span class="opt-label">' + title + '</span>' + inner + '</div>';
   }
-  function windSelect(id, value) {
-    return '<select id="' + id + '">' + WIND_NAMES.map((n, k) => '<option value="' + k + '"' + (k === value ? ' selected' : '') + '>' + n + '</option>').join('') + '</select>';
+  function seg(name, items, value) { // a row of big buttons that are really radio inputs
+    return '<div class="seg" role="radiogroup" aria-label="' + name + '">' + items.map((it) =>
+      '<label><input type="radio" name="' + name + '" value="' + it.value + '"' + (it.value === value ? ' checked' : '') + '><span>' + it.html + '</span></label>').join('') + '</div>';
+  }
+  function windSeg(name, value) {
+    return seg(name, WIND_NAMES.map((n, k) => ({ value: k, html: '<b>' + WIND_ZH[k] + '</b>' + n })), value);
+  }
+  function check(id, text, checked, off) {
+    return '<label class="check' + (off ? ' off' : '') + '"><input id="' + id + '" type="checkbox"' + (checked ? ' checked' : '') + (off ? ' disabled' : '') + '> <span>' + text + '</span></label>';
+  }
+
+  // redraw only what depends on the options, so the control you just used keeps keyboard focus
+  function refreshScore() {
+    renderScoreboard();
+    renderResult();
+    renderShare();
   }
 
   function renderOpts() {
     const s = state;
     $('#opts').innerHTML =
-      optHTML('Win by',
-        '<label><input type="radio" name="how" value="self"' + (s.selfDrawn ? ' checked' : '') + '> Self-drawn</label>' +
-        '<label><input type="radio" name="how" value="discard"' + (!s.selfDrawn ? ' checked' : '') + '> Discard</label>') +
-      optHTML('Prevalent wind', windSelect('prevalent', s.prevalent)) +
-      optHTML('Seat wind', windSelect('seat', s.seat)) +
-      optHTML('Special circumstances',
-        '<label><input id="lastTile" type="checkbox"' + (s.lastTile ? ' checked' : '') + '> Last tile (4th copy of the winning tile)</label>' +
-        '<label><input id="lastOfWall" type="checkbox"' + (s.lastOfWall ? ' checked' : '') + '> Last tile of the wall (' + (s.selfDrawn ? 'draw' : 'discard') + ')</label>' +
-        '<label class="' + (s.selfDrawn ? '' : 'off') + '"><input id="replacement" type="checkbox"' + (s.replacement ? ' checked' : '') + (s.selfDrawn ? '' : ' disabled') + '> Out with replacement tile</label>' +
-        '<label class="' + (s.selfDrawn ? 'off' : '') + '"><input id="robbing" type="checkbox"' + (s.robbing ? ' checked' : '') + (s.selfDrawn ? ' disabled' : '') + '> Robbing the kong</label>');
+      group('Win by', seg('how', [
+        { value: 'self', html: 'Self-drawn' },
+        { value: 'discard', html: 'Discard' },
+      ], s.selfDrawn ? 'self' : 'discard')) +
+      '<div class="opt-pair">' +
+        group('Prevalent wind', windSeg('prevalent', s.prevalent)) +
+        group('Seat wind', windSeg('seat', s.seat)) +
+      '</div>' +
+      group('Special circumstances', '<div class="checks">' +
+        check('lastTile', 'Last tile (4th copy of the winning tile)', s.lastTile) +
+        check('lastOfWall', 'Last tile of the wall (' + (s.selfDrawn ? 'draw' : 'discard') + ')', s.lastOfWall) +
+        check('replacement', 'Out with replacement tile', s.replacement, !s.selfDrawn) +
+        check('robbing', 'Robbing the kong', s.robbing, s.selfDrawn) +
+      '</div>');
 
     document.querySelectorAll('input[name="how"]').forEach((el) => el.addEventListener('change', () => {
       state.selfDrawn = el.value === 'self';
       if (state.selfDrawn) state.robbing = false; else state.replacement = false;
       render();
+      const again = document.querySelector('input[name="how"]:checked'); // render() rebuilt the controls
+      if (again) again.focus({ preventScroll: true });
     }));
-    $('#prevalent').addEventListener('change', (e) => { state.prevalent = +e.target.value; renderResult(); });
-    $('#seat').addEventListener('change', (e) => { state.seat = +e.target.value; renderResult(); });
+    document.querySelectorAll('input[name="prevalent"], input[name="seat"]').forEach((el) => el.addEventListener('change', () => {
+      state[el.name] = +el.value;
+      refreshScore();
+    }));
     for (const id of ['lastTile', 'lastOfWall', 'replacement', 'robbing']) {
-      $('#' + id).addEventListener('change', (e) => { state[id] = e.target.checked; renderResult(); });
+      $('#' + id).addEventListener('change', (e) => { state[id] = e.target.checked; refreshScore(); });
     }
   }
 
@@ -582,7 +674,10 @@
     return waits;
   }
 
-  function renderWaits(box) {
+  function renderWaits() { // sits right under your hand, where you need it
+    const box = $('#waits');
+    box.innerHTML = '';
+    if (!(state.win === null && state.hand.length === cap())) return;
     const waits = findWaits();
     const wrap = document.createElement('div');
     wrap.className = 'waits';
@@ -616,28 +711,14 @@
   function renderResult() {
     const box = $('#result');
     box.innerHTML = '';
-    const ready = state.win !== null && state.hand.length === cap();
-    if (!ready) {
-    const p = document.createElement('p');
-    p.className = 'empty';
-    const t = total();
-    const goal = cap() + 1;
-    if (t > goal) {
-      p.textContent = 'You have ' + t + ' tiles but a hand needs ' + goal + '. Tap a tile you hold four of and declare it as a kong.';
-    }
-    else if (t === goal) {
-      p.textContent = 'Now tap the tile you won with and choose "This is the winning tile".';
-    }
-    else if (state.win === null && state.hand.length === cap()) {
-      p.textContent = 'Your hand is ready and waiting. Tap a winning tile below, or add the tile you won with.';
-    }
-    else {
-      const need = goal - t;
-      p.textContent = 'Add ' + need + ' more tile' + (need === 1 ? '' : 's') + ' to complete the hand (' + t + '/' + goal + ').';
-    }
-    box.appendChild(p);
-    if (state.win === null && state.hand.length === cap()) renderWaits(box);
-    return;
+    if (!ready()) {
+      const p = document.createElement('p');
+      p.className = 'empty';
+      p.textContent = total() === 0 && state.melds.length === 0
+        ? 'Build a hand above and every fan that applies will be listed here.'
+        : pendingText();
+      box.appendChild(p);
+      return;
     }
     const r = score(scoreInput(state.win));
     if (!r.valid) {
@@ -647,13 +728,6 @@
       box.appendChild(p);
       return;
     }
-    const head = document.createElement('div');
-    head.innerHTML =
-      '<div class="total"><strong>' + r.total + '</strong><span>fan' + (r.flowers ? ' (including ' + r.flowers + ' flower' + (r.flowers === 1 ? '' : 's') + ')' : '') + '</span></div>' +
-      '<span class="chip ' + (r.meetsMinimum ? 'ok' : 'bad') + '">' +
-      (r.meetsMinimum ? 'Valid win (8+ fan)' : 'Only ' + r.base + ' fan without flowers: needs 8 to win') + '</span>';
-    box.appendChild(head);
-
     const rows = r.fans.map((f) =>
       '<tr><td><a class="fanlink" href="rules.html#fan-' + f.id + '">' + esc(f.name) + '</a><span class="zh">' + esc(f.zh) + '</span>' +
       (f.count > 1 && f.id !== 'flowers' ? ' <span class="mult">× ' + f.count + '</span>' : '') +
@@ -661,12 +735,14 @@
       '</td><td class="pts">' + f.points + '</td></tr>').join('');
     const table = document.createElement('table');
     table.className = 'fans';
-    table.innerHTML = '<tbody>' + rows + '</tbody><tfoot><tr><td>Total</td><td class="pts">' + r.total + '</td></tr></tfoot>';
+    table.innerHTML = '<tbody>' + rows + '</tbody><tfoot><tr><td>Total' +
+      (r.flowers ? ' <span class="mult">(including ' + r.flowers + ' flower' + (r.flowers === 1 ? '' : 's') + ')</span>' : '') +
+      '</td><td class="pts">' + r.total + '</td></tr></tfoot>';
     box.appendChild(table);
     box.appendChild(decompHTML(r.decomposition));
   }
 
-  renderers.push(renderResult);
+  renderers.push(renderWaits, renderResult);
 
   const SUIT_LETTERS = ['m', 'p', 's', 'z']; // [0,1,2,12] -> 123m4p
   function tilesToShort(tiles) {
